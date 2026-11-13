@@ -1,0 +1,15 @@
+{
+    email {$ACME_EMAIL}
+}
+
+{$HTTPS_DOMAIN} {
+    reverse_proxy frontend:80
+}
+
+# For a LAN-only host with no public DNS, Caddy can issue a private certificate:
+# localhost {
+#     tls internal
+#     reverse_proxy frontend:80
+# }
+# Each client device must trust Caddy's local root certificate before browsers
+# will accept the HTTPS connection.

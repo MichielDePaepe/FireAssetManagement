@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+!.env.production.example
+node_modules/
+frontend/dist/
+backend/.venv/
+backend/**/__pycache__/
+backend/**/*.py[cod]
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+.DS_Store
+*.log
+data/
+coverage/

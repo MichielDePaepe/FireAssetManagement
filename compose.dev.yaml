@@ -1,0 +1,51 @@
+services:
+  api:
+    build:
+      context: ./backend
+      target: development
+    volumes:
+      - ./backend:/app
+    command: ["sh", "/app/scripts/dev-entrypoint.sh"]
+    environment:
+      DJANGO_DEBUG: "true"
+      DJANGO_SECURE_COOKIES: "false"
+      DEMO_USERNAME: ${DEMO_USERNAME:-starter}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-starter-dev-only}
+
+  worker:
+    build:
+      context: ./backend
+      target: development
+    volumes:
+      - ./backend:/app
+    command: ["watchfiles", "--filter", "python", "--sigint-timeout", "120", "--sigkill-timeout", "30", "celery -A ${PYTHON_PACKAGE:-config} worker --loglevel=INFO --concurrency=2", "/app"]
+    environment:
+      DJANGO_DEBUG: "true"
+      DJANGO_SECURE_COOKIES: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+    stop_grace_period: 2m
+
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:5173"
+    environment:
+      APP_TITLE: ${APP_TITLE:-Web Project Starter}
+      VITE_APP_TITLE: ${APP_TITLE:-Web Project Starter}
+      VITE_API_PROXY_TARGET: ${VITE_API_PROXY_TARGET:-http://api:8000}
+
+  flower:
+    command: ["celery", "-A", "${PYTHON_PACKAGE:-config}", "flower", "--address=0.0.0.0", "--port=5555"]
+    ports:
+      - "127.0.0.1:${FLOWER_PORT:-5555}:5555"
+
+volumes:
+  frontend_node_modules:
