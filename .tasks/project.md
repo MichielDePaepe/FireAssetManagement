@@ -1,7 +1,7 @@
 ---
 title: Pager Asset Management
-status: in-progress
-current-phase: 4
+status: complete
+current-phase: ~
 repo: private
 github: ~
 created: 2026-11-14
@@ -13,7 +13,7 @@ Add a staff-managed label-printer module to the pager asset application. Initial
 - [x] Phase 1: Printer management
 - [x] Phase 2: Connection checks and test labels
 - [x] Phase 3: Fireplan pager sync backend
-- [ ] Phase 4: Sync controls, progress, and report
+- [x] Phase 4: Sync controls, progress, and report
 
 ## Specs
 - specs/2026-11-13-labelprinter-module.md (bootstrap) → phases 1-2

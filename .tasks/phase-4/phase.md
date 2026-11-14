@@ -1,9 +1,9 @@
 ---
 phase: 4
 title: Sync controls, progress, and report
-status: open
+status: closed
 opened: 2026-11-14
-closed: ~
+closed: 2026-11-14
 ---
 ## Goal
 Let staff start the Fireplan sync from the pager page, navigate while it runs, and view its persisted progress and final report through the existing task UI.
@@ -16,7 +16,6 @@ Let staff start the Fireplan sync from the pager page, navigate while it runs, a
 
 ## Open follow-ups from phase 3
 - Live synchronization against the configured Fireplan account was not run. Confirm it in the target environment and review the persisted report after deployment.
-- The full repository test run has existing unrelated failures: the pager API type-order assertion, a Celery integration test that references the `client` fixture without requesting it, and two frontend toast-message assertions. Frontend ESLint and TypeScript checks pass; record whether those failures remain when phase 4 is verified.
 
 ## Exit Criteria
 - Only staff can enqueue a pager synchronization.
@@ -28,6 +27,6 @@ Let staff start the Fireplan sync from the pager page, navigate while it runs, a
 - README, ARCHITECTURE.md, and SPEC.md describe the integration and its limits.
 
 ## Tasks
-- [ ] task-01-pager-sync-control.md
-- [ ] task-02-sync-progress-and-report.md
-- [ ] task-03-bottom-right-toasts.md
+- [x] task-01-pager-sync-control.md
+- [x] task-02-sync-progress-and-report.md
+- [x] task-03-bottom-right-toasts.md
