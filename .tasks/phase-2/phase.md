@@ -1,9 +1,9 @@
 ---
 phase: 2
 title: Connection checks and test labels
-status: pending
-opened: ~
-closed: ~
+status: closed
+opened: 2026-11-14
+closed: 2026-11-14
 ---
 ## Goal
 Add a bounded direct network check and a simple text test label for configured Brother PT-P900W printers, using the saved TCP settings and tape width.
@@ -23,3 +23,6 @@ Add a bounded direct network check and a simple text test label for configured B
 - The Brother dependency and its purpose/license status are documented; a real proof print is recorded as a separate manual hardware check.
 
 ## Tasks
+- [x] 01. Bounded printer connection check
+- [x] 02. Brother test-label backend and dependency
+- [x] 03. Printer actions in the management page
