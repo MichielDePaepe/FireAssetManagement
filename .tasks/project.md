@@ -12,6 +12,9 @@ Add a staff-managed label-printer module to the pager asset application. Initial
 ## Phases
 - [x] Phase 1: Printer management
 - [ ] Phase 2: Connection checks and test labels
+- [ ] Phase 3: Fireplan pager sync backend
+- [ ] Phase 4: Sync controls, progress, and report
 
 ## Specs
 - specs/2026-11-13-labelprinter-module.md (bootstrap) → phases 1-2
+- specs/2026-11-14-fireplan-pager-synchronization.md (extension) → phases 3-4
