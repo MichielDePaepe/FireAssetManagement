@@ -1,9 +1,9 @@
 ---
 phase: 1
 title: Printer management
-status: open
+status: closed
 opened: 2026-11-14
-closed: ~
+closed: 2026-11-14
 ---
 ## Goal
 Provide staff-only management of printer records through the Django API and React app. The initial UI supports the Brother PT-P900W and stores settings needed for later connection checks and test labels.
@@ -16,6 +16,6 @@ Provide staff-only management of printer records through the Django API and Reac
 - README, SPEC, and ARCHITECTURE describe the implemented printer-management behavior accurately.
 
 ## Tasks
-- [ ] task-01-printer-model-and-api.md
-- [ ] task-02-printer-management-ui.md
-- [ ] task-03-printer-management-docs.md
+- [x] task-01-printer-model-and-api.md
+- [x] task-02-printer-management-ui.md
+- [x] task-03-printer-management-docs.md
