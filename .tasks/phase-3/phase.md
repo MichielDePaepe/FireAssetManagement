@@ -1,9 +1,9 @@
 ---
 phase: 3
 title: Fireplan pager sync backend
-status: pending
-opened: ~
-closed: ~
+status: closed
+opened: 2026-11-14
+closed: 2026-11-14
 ---
 ## Goal
 Store Fireplan IDs and QR URLs on pager records and synchronize matching Fireplan inventory through a Celery task using the existing Fireplan session and task-result infrastructure.
@@ -21,5 +21,10 @@ Store Fireplan IDs and QR URLs on pager records and synchronize matching Firepla
 - First-time linking uses exact serial number; subsequent runs prefer the stored Fireplan ID.
 - Matching records are created or updated, local-only pagers are retained, and unknown Fireplan models are ignored.
 - The Celery task reports progress and returns counts for added, updated, unchanged, and per-record errors through the existing result backend.
+- Staff can queue synchronization through the documented API, and the existing task collection/detail endpoints expose the persisted Fireplan task report.
 
 ## Tasks
+- [x] task-01-pager-fireplan-fields.md
+- [x] task-02-fireplan-inventory-client.md
+- [x] task-03-celery-pager-synchronization.md
+- [x] task-04-staff-sync-endpoint.md
