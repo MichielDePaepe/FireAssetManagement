@@ -1,12 +1,20 @@
-import { Activity, Gauge, LogOut, Menu, PanelsTopLeft, X } from "lucide-react";
+import { Activity, Boxes, Gauge, LogOut, Menu, Printer, Radio, X } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthProvider";
 import { CommandPalette } from "@/components/CommandPalette";
+import { FireplanTaskMonitor } from "@/components/FireplanTaskMonitor";
 import { Button } from "@/components/ui/button";
 
 const title = import.meta.env.VITE_APP_TITLE || "Web Project Starter";
+
+function CityGISIcon({ className }: { className?: string }) {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M2.65 16.64A10.4 8.2 -38 1 0 17.01 3.19" />
+    <path d="M4.12 12.14A7.2 5.7 -38 1 0 12.32 4.23" />
+  </svg>;
+}
 
 export function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -24,15 +32,16 @@ export function AppLayout() {
   const links = [
     { to: "/", label: "Dashboard", icon: Gauge, end: true },
     { to: "/tasks", label: "Background tasks", icon: Activity, end: false },
+    { to: "/pagers", label: "Pagers", icon: Radio, end: false },
   ];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <FireplanTaskMonitor />
       <aside className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r bg-white transition-transform lg:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex h-16 items-center justify-between border-b px-5">
-          <a className="flex items-center gap-3 font-semibold" href="/">
-            <span className="grid h-8 w-8 place-items-center bg-primary text-primary-foreground"><PanelsTopLeft className="h-4 w-4" /></span>
-            <span className="truncate">{title}</span>
+          <a className="flex items-center" href="/" aria-label="Home">
+            <img className="h-auto w-40 shrink-0" src="/logo-asset-management.svg" alt="Brandweer Brussel Asset Management" />
           </a>
           <button className="lg:hidden" aria-label="Close menu" onClick={() => setMenuOpen(false)}><X className="h-5 w-5" /></button>
         </div>
@@ -44,6 +53,23 @@ export function AppLayout() {
             </NavLink>)}
           </nav>
         </div>
+        {user?.is_staff && <div className="border-t px-4 py-5">
+          <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Beheer</p>
+          <nav className="space-y-1">
+            <NavLink to="/fireplan" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+              <Radio className="h-4 w-4" />Fireplan
+            </NavLink>
+            <NavLink to="/labelprinters" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+              <Printer className="h-4 w-4" />Labelprinters
+            </NavLink>
+            <NavLink to="/inventory" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+              <Boxes className="h-4 w-4" />Inventaris
+            </NavLink>
+            <NavLink to="/citygis" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+              <CityGISIcon className="h-4 w-4 shrink-0" />CityGIS
+            </NavLink>
+          </nav>
+        </div>}
         <div className="mt-auto border-t p-4">
           <div className="mb-3 flex items-center gap-3 px-2">
             <div className="grid h-8 w-8 place-items-center border bg-muted text-xs font-semibold">{user?.username.slice(0, 2).toUpperCase()}</div>

@@ -45,6 +45,11 @@ INSTALLED_APPS = [
     "django_celery_results",
     "drf_spectacular",
     "tasks",
+    "assets",
+    "inventory",
+    "fireplan",
+    "printers",
+    "citygis",
 ]
 
 MIDDLEWARE = [
@@ -97,12 +102,20 @@ REST_FRAMEWORK = {
 }
 SPECTACULAR_SETTINGS = {
     "TITLE": os.getenv("APP_TITLE", "Web Project Starter") + " API",
-    "DESCRIPTION": "Task API for the web project starter.",
+    "DESCRIPTION": "Task and pager asset API.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+FIREPLAN_BASE_URL = os.getenv("FIREPLAN_BASE_URL", "https://fireplan.firebru2k8.local").rstrip("/")
+CITYGIS_RESOURCES_BASE_URL = os.getenv(
+    "CITYGIS_RESOURCES_BASE_URL", "http://resourcesoff.firebru2k8.local"
+).rstrip("/")
+FIREPLAN_CREDENTIAL_KEY = os.getenv("FIREPLAN_CREDENTIAL_KEY", "")
+FIREPLAN_ALLOW_CERTIFICATE_HOSTNAME_MISMATCH = env_bool(
+    "FIREPLAN_ALLOW_CERTIFICATE_HOSTNAME_MISMATCH"
+)
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_CACHE_BACKEND = "default"
 CELERY_TASK_TRACK_STARTED = True
@@ -117,6 +130,12 @@ CELERY_TASK_MAX_RETRIES = int(os.getenv("CELERY_TASK_MAX_RETRIES", "3"))
 CELERY_RESULT_EXTENDED = True
 CELERY_RESULT_EXPIRES = int(os.getenv("CELERY_RESULT_EXPIRES", "604800"))
 CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600}
+CELERY_BEAT_SCHEDULE = {
+    "citygis-refresh-every-minute": {
+        "task": "citygis.refresh",
+        "schedule": 60.0,
+    }
+}
 
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False

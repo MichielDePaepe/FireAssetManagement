@@ -27,6 +27,22 @@ services:
         condition: service_healthy
     stop_grace_period: 2m
 
+  beat:
+    build:
+      context: ./backend
+      target: development
+    volumes:
+      - ./backend:/app
+    command: ["celery", "-A", "${PYTHON_PACKAGE:-config}", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+    environment:
+      DJANGO_DEBUG: "true"
+      DJANGO_SECURE_COOKIES: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+    stop_grace_period: 30s
+
+
   frontend:
     build:
       context: ./frontend
@@ -36,7 +52,13 @@ services:
       - frontend_node_modules:/app/node_modules
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-5173}:5173"
+      - "127.0.0.1:${FRONTEND_PORT:-5174}:5173"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     environment:
       APP_TITLE: ${APP_TITLE:-Web Project Starter}
       VITE_APP_TITLE: ${APP_TITLE:-Web Project Starter}
@@ -45,7 +67,7 @@ services:
   flower:
     command: ["celery", "-A", "${PYTHON_PACKAGE:-config}", "flower", "--address=0.0.0.0", "--port=5555"]
     ports:
-      - "127.0.0.1:${FLOWER_PORT:-5555}:5555"
+      - "127.0.0.1:${FLOWER_PORT:-5556}:5555"
 
 volumes:
   frontend_node_modules:

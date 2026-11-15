@@ -54,6 +54,16 @@ def test_task_api_requires_login():
     assert response.status_code == 403
 
 
+def test_session_endpoint_includes_staff_status(client, user):
+    user.is_staff = True
+    user.save(update_fields=["is_staff"])
+
+    response = client.get(reverse("me"))
+
+    assert response.status_code == 200
+    assert response.json() == {"username": user.get_username(), "is_staff": True}
+
+
 def test_task_status_endpoint_uses_celery_id(client):
     snapshot = {
         "task_id": "task-123",
@@ -68,6 +78,23 @@ def test_task_status_endpoint_uses_celery_id(client):
         response = client.get(reverse("task-detail", args=["task-123"]))
     assert response.status_code == 200
     assert response.json()["progress"]["percent"] == 20
+
+
+def test_task_detail_exposes_fireplan_sync_result(client):
+    snapshot = {
+        "task_id": "fireplan-task-123",
+        "task_name": "fireplan.sync_pagers",
+        "status": "SUCCESS",
+        "progress": None,
+        "result": {"added": 2, "updated": 1, "unchanged": 4, "errors": []},
+        "error": None,
+        "updated_at": None,
+    }
+    with patch("tasks.views.task_snapshot", return_value=snapshot):
+        response = client.get(reverse("task-detail", args=["fireplan-task-123"]))
+
+    assert response.status_code == 200
+    assert response.json()["result"]["added"] == 2
 
 
 def test_progress_recorder_payload_is_exposed_without_an_extra_model():
@@ -137,10 +164,11 @@ def test_task_failure_is_recorded_in_celery_result_backend(monkeypatch):
 
 
 @pytest.mark.integration
+@pytest.mark.django_db(transaction=True)
 @pytest.mark.skipif(
     os.getenv("RUN_CELERY_INTEGRATION") != "true", reason="Requires a live Redis broker"
 )
-def test_celery_worker_persists_progress_and_result():
+def test_celery_worker_persists_progress_and_result(client):
     with start_worker(celery_app, concurrency=1, loglevel="WARNING", perform_ping_check=False):
         start_response = client.post(
             reverse("task-collection"),
@@ -169,10 +197,15 @@ def test_celery_worker_persists_progress_and_result():
     ]
 
     assert any(
-        event["status"] == "PROGRESS" and event["progress"]["current"] > 0 for event in events
-    )
+        event["status"] == "PROGRESS"
+        and event["progress"] is not None
+        and event["progress"]["current"] > 0
+        for event in events
+    ), events
     assert events[-1]["status"] == "SUCCESS"
-    assert events[-1]["result"] == {
+    detail_response = client.get(reverse("task-detail", args=[task_id]))
+    assert detail_response.status_code == 200
+    assert detail_response.json()["result"] == {
         "message": "Example task completed successfully.",
         "duration_seconds": 5,
     }

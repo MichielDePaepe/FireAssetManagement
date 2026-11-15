@@ -11,6 +11,19 @@ This is a reusable React + Django web application template. Keep implementation 
 - Keep secrets in environment variables; never commit `.env`, passwords, tokens, or private certificates.
 - All visual components must have square corners. Follow the shared shadcn-style components before adding custom primitives.
 - Use the existing packages for task execution, progress, result persistence, and monitoring. Do not build another task framework, event bus, or task-result model.
+- Follow the **Sortable and filterable tables** interaction pattern below whenever adding sorting or filters to a table.
+
+### Sortable and filterable tables
+
+Use the CityGIS vector table in `frontend/src/pages/CityGISPage.tsx` as the reference interaction:
+
+- Put sorting controls in the column header. Clicking the column name sorts ascending; clicking it again reverses the direction. Show a neutral sort icon on inactive columns and a direction icon on the active column. Set `aria-sort` on the active header and give the control an accessible name.
+- Put a separate, square filter-icon button beside the header label for filterable columns. Keep its width fixed so it cannot squeeze the label or move other columns. Show the selected-filter count in a small round badge at the button's upper-right corner.
+- Open the filter only when its icon is clicked. Render the popup in a portal over the table, without a page-dimming backdrop and without changing table dimensions. Position it against the trigger and keep it inside the viewport. Close on outside click or Escape.
+- Use checkboxes for multi-select. Selecting an option applies it and closes the popup; reopening it shows the current selections. Provide a clear action. Combine selected values within one column with OR, and combine different columns' filters with AND.
+- Keep table geometry steady while filters change: use a fixed table layout with an explicit `colgroup`, a collapsed border model, fixed-size filter buttons, and one aligned bottom border across the header row. Do not let opening a popup or selecting a filter resize or shift the table.
+- Keep sort and filter state independent so users can use both together. Compare text with the active locale, using case-insensitive and numeric-aware ordering where appropriate, and add a stable key as a tie-breaker.
+- Preserve accessible state (`aria-expanded`, `aria-label`, and `aria-sort`) and keyboard dismissal. If another page needs the same behavior, reuse or extract the shared implementation instead of introducing a visually different table pattern.
 
 ## Technology restrictions
 

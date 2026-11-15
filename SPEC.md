@@ -2,7 +2,15 @@
 
 ## Purpose and scope
 
-Provide a reusable GitHub template for web applications that start with a working React frontend, Django REST API, PostgreSQL database, Celery background workers, task progress, and Docker-based development and production environments.
+The application manages pagers, Fireplan vehicles, CityGIS vectors, locations, services, and RiC/AdC address records on the reusable React/Django foundation. Pager and vehicle records are physical assets with structured type-specific fields and a shared managed-object identity; vectors remain distinct operational objects. Radios and other equipment may become asset types later, with their own fields and behavior; they are not part of the current implementation.
+
+For pagers, the application records the identifiers and metadata needed to describe how a pager can be addressed for alerting. It does not transmit alerts to ASTRID or send POCSAG/SDS messages.
+
+### Pager alerting domain
+
+- **POCSAG** is the paging network protocol through which pager alert codes are broadcast. A pager listens for one or more configured **RiC codes** and triggers when it receives a matching code.
+- **AdC** is the associated addressing code supplied to ASTRID to identify which pager should be alerted. The RiC and AdC values form one managed pager-code record in this application.
+- RiC/AdC code pairs are maintained in a standalone list, not attached to an individual pager asset. Each pair has a human-readable alias, for example `A HELI 1`.
 
 ## Functional requirements
 
@@ -22,6 +30,24 @@ Provide a reusable GitHub template for web applications that start with a workin
 | FR-012 | Template users can configure project name, app title, Python package, Compose name, ports, and environment values. | `.env.example` and `scripts/configure_project.py`. |
 | FR-013 | `make clean` requires an explicit typed confirmation before deleting persistent data. | Make target checks for `DELETE`. |
 | FR-014 | GitHub Actions runs tests and lint/type checks. | CI workflow. |
+| FR-015 | Authenticated users can list, create, edit, and delete pagers with a unique serial number and a selected pager type. | Pager API and asset list form. |
+| FR-016 | The initial pager types are Swissphone s.QUAD X35 and Swissphone RES.Q XS. | Data migration seeds the type table. |
+| FR-017 | Staff can configure Fireplan login credentials; password and session cookies are encrypted at rest and never returned to the browser. | Staff-only API, Fernet encryption, and Fireplan settings page. |
+| FR-018 | Fireplan login checks reuse a valid saved session and reauthenticate after it is no longer accepted. | Cookie-jar persistence and authenticated-profile check. |
+| FR-019 | Staff can list, create, edit, and delete label-printer configurations; the initial supported printer is Brother PT-P900W. | Staff-only printer API, management page, and CRUD tests. |
+| FR-020 | Printer configurations store a management name, IP address, TCP port, and supported default tape width. | Validated `Printer` model and form in Beheer → Labelprinters. |
+| FR-021 | Staff can check TCP reachability for a saved printer with a bounded timeout; the result does not assert physical readiness. | Staff-only printer action, outcome handling, and socket-mocked tests. |
+| FR-022 | Staff can send a text test label with the printer name and current time using the saved Brother model, IP, port, and tape width. | Brother driver service, staff-only action, and mocked driver tests. |
+| FR-023 | Staff can start a Celery-based Fireplan pager sync from the pager page, navigate while it runs, and reopen its persisted progress and report by Celery ID. Matching configured pager types update serial number, Fireplan ID, and Fireplan QR URL; local-only pagers remain. | Staff-only start API, browser task tracking, SSE progress, result modal, and integration tests. |
+| FR-024 | Authenticated users can independently maintain a list of RiC/AdC code pairs. Each record contains the numeric RiC code received by pagers over POCSAG, the associated numeric AdC code used to identify the pager to ASTRID, and a descriptive alias. Records are not linked to pager assets. Duplicate RiC/AdC pairs are rejected. | Standalone RiC-codes tab and CRUD API; seeded data migration; database/API duplicate validation tests. |
+| FR-025 | Staff can view active Fireplan vehicles and individual CityGIS vectors, with each vector's raw operational status code, catalog description/color, source timestamp, and matching vehicle when available. Vector records are kept separate; duplicate vehicle matches link only the first source-order vector and log an error. CityGIS synchronization does not infer or alter locally managed pager and RiC/AdC relationships. | CityGIS source synchronization, local status catalog, staff snapshot API, and searchable CityGIS page. |
+| FR-026 | CityGIS synchronizes every minute through Celery Beat and supports a staff-triggered refresh of the same task. Snapshot changes reach the page through the existing SSE/database polling mechanism, and source errors preserve the last successful data. | Beat schedule, staff-only refresh/snapshot/SSE endpoints, synchronization-state row, and UI tests. |
+| FR-027 | Pagers, Fireplan vehicles, and CityGIS vectors have stable shared managed-object identities and explicit kinds; type-specific and source-owned fields remain on their existing typed records. | `inventory.ManagedObject`, pager/vehicle/vector foreign keys, backfill migrations, and typed serializers. |
+| FR-028 | Locations form a parent-child hierarchy and may map one CityGIS service; vectors reference normalized services while retaining the raw source abbreviation. A vector post is derived only from a service mapped to a post location. | CityGIS service/location models, vector service foreign key and derived post, migration backfill, and synchronization tests. |
+| FR-029 | Operational assignments have explicit relationship types, retain prior assignments, and allow at most one active assignment per physical asset. Observed physical locations are separately timestamped; expected location is derived from the assignment and current vector-vehicle link. | Managed relationship history, database cardinality constraint, observation model, derived property, and concurrency tests. |
+| FR-030 | RiC/AdC records remain separate address records and can be linked to vectors with history, with at most one active vector per code and multiple codes per vector. | Historical RiC-code/vector relationship model and uniqueness constraint. |
+| FR-031 | Staff can choose Pagers, Vectors, or RiC/AdC, search and sort the matching object table, and manage compatible links in a focused modal. Pager and RiC/AdC records use a searchable single-vector choice; vectors show searchable available and linked pagers and codes in two columns. CityGIS/Fireplan fields remain read-only, and links retain history. Inactive vectors are omitted from new choices; physical inventory checking is excluded. | Staff-only inventory snapshot and relationship APIs, type-driven sortable inventory table, relationship modal, and API/frontend regression tests. |
+| FR-032 | Staff can click a vector's operational status and view its latest 50 status episodes in a modal. Each episode shows its status, start time, and duration; unchanged sync snapshots do not create duplicate episodes. Existing vectors are seeded with their current status, while unavailable earlier source history is not invented. | Status-history model and migration, staff-only per-vector history endpoint, and CityGIS status-history modal. |
 
 ## Non-functional requirements
 
@@ -53,9 +79,14 @@ Provide a reusable GitHub template for web applications that start with a workin
 - Worker autoreload uses Watchfiles.
 - Task IDs are Celery IDs and are saved in browser local storage for convenient return to the active task.
 - Production defaults to a trusted-LAN HTTP deployment; optional HTTPS uses the supplied Caddy overlay.
+- CityGIS uses `CITYGIS_RESOURCES_BASE_URL` for the resources-service origin and reuses the encrypted Fireplan credentials. Celery Beat schedules a result-free refresh every 60 seconds; SSE polls saved snapshots once per second.
 
 ## Open questions
 
 - Per-user task ownership and account provisioning are outside this single-tenant starter scope; add them before exposing it as a multi-user service.
 - Production secrets, domain names, backup policy, and retention are deployment-specific and must be set by each template user.
 - Cancellation remains unavailable until task-specific cooperative cancellation can be defined safely.
+- A physical PT-P900W proof print remains a separate manual hardware check; automated driver tests mock I/O and do not confirm a physical label.
+- The RiC/AdC pair is unique. Whether RiC or AdC values must each be globally unique independently remains to be confirmed.
+- Live synchronization against the configured Fireplan account remains an environment-specific verification. Fireplan supplies the QR URL; generating printable labels and adding pager detail-page label actions remain future work.
+- Keep `FIREPLAN_CREDENTIAL_KEY` backed up and stable; existing credentials and sessions cannot be decrypted after key loss or rotation.

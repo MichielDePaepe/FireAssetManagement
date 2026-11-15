@@ -12,6 +12,11 @@ urlpatterns = [
     path("api/auth/logout/", auth_views.logout_view, name="logout"),
     path("api/auth/me/", auth_views.me_view, name="me"),
     path("api/", include("tasks.urls")),
+    path("api/", include("assets.urls")),
+    path("api/", include("inventory.urls")),
+    path("api/", include("fireplan.urls")),
+    path("api/", include("printers.urls")),
+    path("api/", include("citygis.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
 ]

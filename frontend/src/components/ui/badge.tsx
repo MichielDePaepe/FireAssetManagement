@@ -10,5 +10,5 @@ const tones: Record<string, string> = {
 };
 
 export function Badge({ className, tone = "muted", ...props }: HTMLAttributes<HTMLSpanElement> & { tone?: keyof typeof tones }) {
-  return <span className={cn("inline-flex items-center border border-transparent px-2.5 py-0.5 text-xs font-semibold rounded-none", tones[tone], className)} {...props} />;
+  return <span className={cn("inline-flex items-center border border-transparent px-2.5 py-0.5 text-xs font-semibold rounded-sm", tones[tone], className)} {...props} />;
 }

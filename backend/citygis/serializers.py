@@ -1,0 +1,147 @@
+from rest_framework import serializers
+
+from inventory.serializers import ManagedObjectIdentitySerializer
+
+from .models import Location, Service, Vector, VectorStatus, VectorStatusHistory, Vehicle
+
+
+class VehicleSerializer(serializers.ModelSerializer):
+    managed_object = ManagedObjectIdentitySerializer(read_only=True)
+
+    class Meta:
+        model = Vehicle
+        fields = [
+            "id",
+            "managed_object",
+            "fireplan_id",
+            "alphacode",
+            "plate",
+            "utilisation",
+            "chassis",
+            "fleet_status",
+            "is_current",
+            "last_seen_at",
+        ]
+
+
+class VectorStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VectorStatus
+        fields = ["code", "description", "abbreviation", "color"]
+
+
+class VectorStatusHistorySerializer(serializers.ModelSerializer):
+    status_since = serializers.SerializerMethodField()
+    duration_seconds = serializers.SerializerMethodField()
+    status_description = serializers.SerializerMethodField()
+    status_abbreviation = serializers.SerializerMethodField()
+    status_color = serializers.SerializerMethodField()
+    is_current = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VectorStatusHistory
+        fields = [
+            "id",
+            "status_code",
+            "status_description",
+            "status_abbreviation",
+            "status_color",
+            "status_since",
+            "observed_at",
+            "ended_at",
+            "duration_seconds",
+            "is_current",
+        ]
+
+    def _catalog_status(self, obj):
+        return self.context["status_catalog"].get(obj.status_code)
+
+    def get_status_since(self, obj):
+        return obj.source_effective_at or obj.observed_at
+
+    def get_duration_seconds(self, obj):
+        start = obj.source_effective_at or obj.observed_at
+        end = obj.ended_at or self.context["now"]
+        return max(0, int((end - start).total_seconds()))
+
+    def get_status_description(self, obj):
+        status = self._catalog_status(obj)
+        return status.description if status else None
+
+    def get_status_abbreviation(self, obj):
+        status = self._catalog_status(obj)
+        return status.abbreviation if status else None
+
+    def get_status_color(self, obj):
+        status = self._catalog_status(obj)
+        return status.color if status else None
+
+    def get_is_current(self, obj):
+        return obj.ended_at is None
+
+
+class ServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Service
+        fields = ["id", "abbreviation"]
+
+
+class LocationSerializer(serializers.ModelSerializer):
+    parent_id = serializers.IntegerField(read_only=True)
+    service_id = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Location
+        fields = ["id", "name", "kind", "parent_id", "service_id"]
+
+
+class VectorSerializer(serializers.ModelSerializer):
+    managed_object = ManagedObjectIdentitySerializer(read_only=True)
+    service = ServiceSerializer(read_only=True)
+    post = LocationSerializer(read_only=True)
+    vehicle = VehicleSerializer(read_only=True)
+    status_description = serializers.SerializerMethodField()
+    status_abbreviation = serializers.SerializerMethodField()
+    status_color = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Vector
+        fields = [
+            "id",
+            "managed_object",
+            "vector_code",
+            "name",
+            "abbreviation",
+            "service_abbreviation",
+            "service",
+            "post",
+            "resource_type_code",
+            "resource_code",
+            "operational_status_code",
+            "status_description",
+            "status_abbreviation",
+            "status_updated_at",
+            "status_color",
+            "vehicle",
+            "source_vehicle_name",
+            "is_current",
+            "last_seen_at",
+        ]
+
+    def _status(self, obj):
+        catalog = self.context.get("status_catalog")
+        if catalog is not None:
+            return catalog.get(obj.operational_status_code)
+        return VectorStatus.objects.filter(pk=obj.operational_status_code).first()
+
+    def get_status_description(self, obj):
+        status = self._status(obj)
+        return status.description if status else None
+
+    def get_status_abbreviation(self, obj):
+        status = self._status(obj)
+        return status.abbreviation if status else None
+
+    def get_status_color(self, obj):
+        status = self._status(obj)
+        return status.color if status else None

@@ -1,5 +1,6 @@
 import os
 
+from cryptography.fernet import Fernet
 from django.core.management.base import BaseCommand, CommandError
 
 
@@ -20,4 +21,11 @@ class Command(BaseCommand):
             raise CommandError("Set POSTGRES_PASSWORD to a unique value of at least 16 characters.")
         if not os.getenv("DJANGO_ALLOWED_HOSTS", "").strip():
             raise CommandError("Set DJANGO_ALLOWED_HOSTS to the production hostnames.")
+        credential_key = os.getenv("FIREPLAN_CREDENTIAL_KEY", "")
+        if not credential_key:
+            raise CommandError("Set FIREPLAN_CREDENTIAL_KEY to a unique Fernet key.")
+        try:
+            Fernet(credential_key.encode("ascii"))
+        except (ValueError, UnicodeEncodeError) as error:
+            raise CommandError("FIREPLAN_CREDENTIAL_KEY must be a valid Fernet key.") from error
         self.stdout.write(self.style.SUCCESS("Production environment values passed validation."))

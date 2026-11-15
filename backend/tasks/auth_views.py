@@ -26,7 +26,7 @@ def login_view(request):
     if user is None:
         return JsonResponse({"detail": "Invalid username or password."}, status=400)
     login(request, user)
-    return JsonResponse({"username": user.get_username()})
+    return JsonResponse({"username": user.get_username(), "is_staff": user.is_staff})
 
 
 @require_POST
@@ -40,4 +40,6 @@ def logout_view(request):
 def me_view(request):
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "Authentication credentials were not provided."}, status=401)
-    return JsonResponse({"username": request.user.get_username()})
+    return JsonResponse(
+        {"username": request.user.get_username(), "is_staff": request.user.is_staff}
+    )

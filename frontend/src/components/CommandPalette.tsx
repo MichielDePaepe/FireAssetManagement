@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { Command } from "cmdk";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Activity, Home, Search } from "lucide-react";
+import { Activity, Home, Printer, Radio, Search } from "lucide-react";
+import { useAuth } from "@/auth/AuthProvider";
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
@@ -32,6 +34,9 @@ export function CommandPalette() {
               <Command.Group heading="Navigate" className="px-2 py-1 text-xs text-muted-foreground">
                 <Command.Item onSelect={() => { navigate("/"); setOpen(false); }} className="flex cursor-pointer items-center gap-2 p-2 text-sm aria-selected:bg-muted"><Home className="h-4 w-4" />Dashboard</Command.Item>
                 <Command.Item onSelect={() => { navigate("/tasks"); setOpen(false); }} className="flex cursor-pointer items-center gap-2 p-2 text-sm aria-selected:bg-muted"><Activity className="h-4 w-4" />Background tasks</Command.Item>
+                <Command.Item onSelect={() => { navigate("/pagers"); setOpen(false); }} className="flex cursor-pointer items-center gap-2 p-2 text-sm aria-selected:bg-muted"><Radio className="h-4 w-4" />Pagers</Command.Item>
+                {user?.is_staff && <Command.Item onSelect={() => { navigate("/fireplan"); setOpen(false); }} className="flex cursor-pointer items-center gap-2 p-2 text-sm aria-selected:bg-muted"><Radio className="h-4 w-4" />Fireplan</Command.Item>}
+                {user?.is_staff && <Command.Item onSelect={() => { navigate("/labelprinters"); setOpen(false); }} className="flex cursor-pointer items-center gap-2 p-2 text-sm aria-selected:bg-muted"><Printer className="h-4 w-4" />Labelprinters</Command.Item>}
               </Command.Group>
             </Command.List>
           </Command>

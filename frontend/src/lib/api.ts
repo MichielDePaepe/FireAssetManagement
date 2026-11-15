@@ -12,9 +12,29 @@ export interface TaskSnapshot {
   task_name: string | null;
   status: TaskStatus;
   progress: TaskProgress | null;
-  result: { message?: string; duration_seconds?: number } | null;
+  result: ExampleTaskResult | FireplanSyncResult | null;
   error: string | null;
   updated_at: string | null;
+}
+
+export interface ExampleTaskResult {
+  message?: string;
+  duration_seconds?: number;
+}
+
+export interface FireplanSyncError {
+  fireplan_id: number | null;
+  serial_number: string | null;
+  name: string | null;
+  message: string;
+}
+
+export interface FireplanSyncResult {
+  message?: string;
+  added: number;
+  updated: number;
+  unchanged: number;
+  errors: FireplanSyncError[];
 }
 
 export interface StartedTask {
@@ -22,8 +42,166 @@ export interface StartedTask {
   status: "PENDING";
 }
 
+export interface ManagedObjectIdentity {
+  id: number;
+  kind: "pager" | "vehicle" | "vector";
+}
+
+export interface CityGISService {
+  id: number;
+  abbreviation: string;
+}
+
+export interface CityGISLocation {
+  id: number;
+  name: string;
+  kind: "post" | "building" | "room" | "other";
+  parent_id: number | null;
+  service_id: number | null;
+}
+
+export interface CityGISVehicle {
+  id: number;
+  managed_object: ManagedObjectIdentity;
+  fireplan_id: number;
+  alphacode: string;
+  plate: string;
+  utilisation: string;
+  chassis: string;
+  fleet_status: string;
+  is_current: boolean;
+  last_seen_at: string | null;
+}
+
+export interface CityGISVectorStatus {
+  code: string;
+  description: string;
+  abbreviation: string;
+  color: string;
+}
+
+export interface CityGISVector {
+  id: number;
+  managed_object: ManagedObjectIdentity;
+  vector_code: string;
+  name: string;
+  abbreviation: string;
+  service_abbreviation: string;
+  service: CityGISService | null;
+  post: CityGISLocation | null;
+  resource_type_code: string;
+  resource_code: string;
+  operational_status_code: string;
+  status_description: string | null;
+  status_abbreviation: string | null;
+  status_updated_at: string | null;
+  status_color: string | null;
+  vehicle: CityGISVehicle | null;
+  source_vehicle_name: string;
+  is_current: boolean;
+  last_seen_at: string | null;
+}
+
+export interface CityGISSyncState {
+  last_attempted_at: string | null;
+  last_succeeded_at: string | null;
+  last_error: string | null;
+}
+
+export interface CityGISSnapshot {
+  vehicles: CityGISVehicle[];
+  vectors: CityGISVector[];
+  statuses: CityGISVectorStatus[];
+  last_refreshed_at: string | null;
+  sync_state: CityGISSyncState;
+}
+
+export interface CityGISVectorStatusHistoryItem {
+  id: number;
+  status_code: string;
+  status_description: string | null;
+  status_abbreviation: string | null;
+  status_color: string | null;
+  status_since: string | null;
+  observed_at: string;
+  ended_at: string | null;
+  duration_seconds: number;
+  is_current: boolean;
+}
+
 export interface UserSession {
   username: string;
+  is_staff: boolean;
+}
+
+export interface FireplanCredentials {
+  login: string;
+  password_configured: boolean;
+  session_configured: boolean;
+  session_checked_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PagerType {
+  id: number;
+  name: string;
+}
+
+export interface Pager {
+  id: number;
+  managed_object: ManagedObjectIdentity;
+  serial_number: string;
+  type: PagerType;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RicCode {
+  id: number;
+  ric_code: string;
+  adc_code: string;
+  alias: string;
+}
+
+export interface InventoryPager extends Pager {
+  assigned_vector_id: number | null;
+}
+
+export interface InventoryRicCode extends RicCode {
+  vector_id: number | null;
+}
+
+export interface InventorySnapshot {
+  locations: CityGISLocation[];
+  vectors: CityGISVector[];
+  pagers: InventoryPager[];
+  ric_codes: InventoryRicCode[];
+}
+
+export interface LabelPrinter {
+  id: number;
+  name: string;
+  manufacturer: string;
+  model: string;
+  ip_address: string;
+  port: number;
+  tape_width_mm: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LabelPrinterValues {
+  name: string;
+  manufacturer: string;
+  model: string;
+  ip_address: string;
+  port: number;
+  tape_width_mm: number;
+}
+
+export interface PrinterActionResult {
+  status: "reachable" | "timeout" | "unreachable" | "sent";
+  detail: string;
 }
 
 export class ApiError extends Error {
@@ -67,6 +245,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
     throw new ApiError(message, response.status);
   }
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
@@ -84,10 +263,65 @@ export const api = {
   },
   logout: () => request<{ ok: boolean }>("/auth/logout/", { method: "POST" }),
   listTasks: () => request<TaskSnapshot[]>("/tasks/"),
+  getCityGIS: () => request<CityGISSnapshot>("/citygis/"),
+  getCityGISVectorStatusHistory: (vectorId: number) =>
+    request<CityGISVectorStatusHistoryItem[]>(`/citygis/vectors/${vectorId}/status-history/`),
+  startCityGISRefresh: () => request<StartedTask>("/citygis/refresh/", { method: "POST" }),
+  cityGISEventsUrl: () => `${API_BASE}/citygis/events/`,
   startTask: (duration_seconds: number) =>
     request<StartedTask>("/tasks/", { method: "POST", body: JSON.stringify({ duration_seconds }) }),
+  startFireplanSync: () =>
+    request<StartedTask>("/fireplan/sync-pagers/", { method: "POST" }),
   getTask: (id: string) => request<TaskSnapshot>(`/tasks/${encodeURIComponent(id)}/`),
   taskEventsUrl: (id: string) => `${API_BASE}/tasks/${encodeURIComponent(id)}/events/`,
+  listPagers: () => request<Pager[]>("/pagers/"),
+  listPagerTypes: () => request<PagerType[]>("/pager-types/"),
+  createPager: (values: { serial_number: string; type_id: number }) =>
+    request<Pager>("/pagers/", { method: "POST", body: JSON.stringify(values) }),
+  updatePager: (id: number, values: { serial_number: string; type_id: number }) =>
+    request<Pager>(`/pagers/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
+  deletePager: (id: number) => request<void>(`/pagers/${id}/`, { method: "DELETE" }),
+  listRicCodes: () => request<RicCode[]>("/ric-codes/"),
+  getInventory: () => request<InventorySnapshot>("/inventory/"),
+  updatePagerVector: (pagerId: number, vectorId: number | null) =>
+    request<{ vector_id: number | null }>(`/inventory/pagers/${pagerId}/vector/`, {
+      method: "PUT",
+      body: JSON.stringify({ vector_id: vectorId }),
+    }),
+  updateRicCodeVector: (codeId: number, vectorId: number | null) =>
+    request<{ vector_id: number | null }>(`/inventory/ric-codes/${codeId}/vector/`, {
+      method: "PUT",
+      body: JSON.stringify({ vector_id: vectorId }),
+    }),
+  createRicCode: (values: Omit<RicCode, "id">) =>
+    request<RicCode>("/ric-codes/", { method: "POST", body: JSON.stringify(values) }),
+  updateRicCode: (id: number, values: Omit<RicCode, "id">) =>
+    request<RicCode>(`/ric-codes/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
+  deleteRicCode: (id: number) => request<void>(`/ric-codes/${id}/`, { method: "DELETE" }),
+  listPrinters: () => request<LabelPrinter[]>("/printers/"),
+  createPrinter: (values: LabelPrinterValues) =>
+    request<LabelPrinter>("/printers/", { method: "POST", body: JSON.stringify(values) }),
+  updatePrinter: (id: number, values: LabelPrinterValues) =>
+    request<LabelPrinter>(`/printers/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
+  deletePrinter: (id: number) => request<void>(`/printers/${id}/`, { method: "DELETE" }),
+  checkPrinterConnection: (id: number) =>
+    request<PrinterActionResult>(`/printers/${id}/check-connection/`, { method: "POST" }),
+  printTestLabel: (id: number) =>
+    request<PrinterActionResult>(`/printers/${id}/print-test-label/`, { method: "POST" }),
+  getFireplanCredentials: () => request<FireplanCredentials>("/fireplan/credentials/"),
+  saveFireplanCredentials: (values: { login: string; password?: string }) =>
+    request<FireplanCredentials>("/fireplan/credentials/", {
+      method: "PUT",
+      body: JSON.stringify(values),
+    }),
+  testFireplanLogin: () =>
+    request<{
+      ok: boolean;
+      detail: string;
+      session_reused: boolean;
+      session_configured: boolean;
+      session_checked_at: string;
+    }>("/fireplan/test-login/", { method: "POST" }),
 };
 
 export function subscribeToTask(
@@ -99,6 +333,22 @@ export function subscribeToTask(
   source.addEventListener("task", (event) => {
     try {
       onUpdate(JSON.parse((event as MessageEvent<string>).data) as TaskSnapshot);
+    } catch {
+      onError?.();
+    }
+  });
+  source.onerror = () => onError?.();
+  return () => source.close();
+}
+
+export function subscribeToCityGIS(
+  onUpdate: (snapshot: CityGISSnapshot) => void,
+  onError?: () => void,
+): () => void {
+  const source = new EventSource(api.cityGISEventsUrl(), { withCredentials: true });
+  source.addEventListener("citygis", (event) => {
+    try {
+      onUpdate(JSON.parse((event as MessageEvent<string>).data) as CityGISSnapshot);
     } catch {
       onError?.();
     }

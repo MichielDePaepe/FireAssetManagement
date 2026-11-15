@@ -1,5 +1,4 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PanelsTopLeft } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -33,7 +32,7 @@ export function LoginPage() {
   return <div className="grid min-h-screen place-items-center bg-muted/50 p-4">
     <Card className="w-full max-w-md shadow-sm">
       <CardHeader className="space-y-4">
-        <div className="grid h-10 w-10 place-items-center bg-primary text-primary-foreground"><PanelsTopLeft className="h-5 w-5" /></div>
+        <img className="h-auto w-44" src="/logo-asset-management.svg" alt="Brandweer Brussel Asset Management" />
         <div><CardTitle>Sign in</CardTitle><CardDescription className="mt-2">Sign in to open your project workspace.</CardDescription></div>
       </CardHeader>
       <CardContent>

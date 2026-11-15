@@ -19,6 +19,7 @@ from .serializers import StartTaskSerializer
 from .tasks import example_task
 
 logger = logging.getLogger(__name__)
+TRACKED_TASK_NAMES = ("tasks.example_task", "fireplan.sync_pagers", "citygis.refresh")
 
 
 @require_GET
@@ -77,7 +78,9 @@ def task_collection(request):
         )
         return Response({"task_id": task.id, "status": "PENDING"}, status=status.HTTP_202_ACCEPTED)
 
-    rows = TaskResult.objects.filter(task_name="tasks.example_task").order_by("-date_created")[:50]
+    rows = TaskResult.objects.filter(task_name__in=TRACKED_TASK_NAMES).order_by(
+        "-date_created"
+    )[:50]
     data = [task_snapshot(row.task_id) for row in rows]
     return Response(data)
 
@@ -86,9 +89,7 @@ def task_collection(request):
 @permission_classes([IsAuthenticated])
 def task_detail(request, task_id: str):
     snapshot = task_snapshot(task_id)
-    if snapshot["task_name"] != "tasks.example_task" and snapshot["status"] == "PENDING":
-        return Response({"detail": "Task not found."}, status=status.HTTP_404_NOT_FOUND)
-    if snapshot["task_name"] not in (None, "tasks.example_task"):
+    if snapshot["task_name"] not in TRACKED_TASK_NAMES:
         return Response({"detail": "Task not found."}, status=status.HTTP_404_NOT_FOUND)
     return Response(snapshot)
 

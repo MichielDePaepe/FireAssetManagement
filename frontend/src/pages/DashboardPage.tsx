@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StartTaskForm } from "@/components/StartTaskForm";
 import { TaskProgress } from "@/components/TaskProgress";
 import { api, type TaskSnapshot } from "@/lib/api";
+import { taskLabel, taskStatusLabel } from "@/lib/taskPresentation";
 
 export function DashboardPage() {
   const [tasks, setTasks] = useState<TaskSnapshot[]>([]);
@@ -32,7 +33,20 @@ export function DashboardPage() {
     }
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const interval = window.setInterval(refreshWhenVisible, 5000);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refresh]);
 
   const start = async (duration: number) => {
     setStarting(true);
@@ -85,10 +99,10 @@ export function DashboardPage() {
 
     {activeTask && <Card><CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle>Saved task</CardTitle><CardDescription className="mt-1 font-mono text-xs">{activeTask.task_id}</CardDescription></div><Button variant="outline" asChild><Link to={`/tasks/${activeTask.task_id}`}>Open task <ArrowRight className="h-4 w-4" /></Link></Button></div></CardHeader><CardContent><TaskProgress task={activeTask} /></CardContent></Card>}
 
-    <Card>
-      <CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle>Recent background tasks</CardTitle><CardDescription className="mt-1">Latest example task executions.</CardDescription></div><Button variant="outline" asChild><Link to="/tasks">View all <ArrowRight className="h-4 w-4" /></Link></Button></div></CardHeader>
+      <Card>
+        <CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle>Recent background tasks</CardTitle><CardDescription className="mt-1">Latest task executions. Status updates automatically.</CardDescription></div><Button variant="outline" asChild><Link to="/tasks">View all <ArrowRight className="h-4 w-4" /></Link></Button></div></CardHeader>
       <CardContent>
-        {loading ? <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" />Loading tasks…</div> : tasks.length === 0 ? <div className="py-8 text-center"><Play className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-3 text-sm font-medium">No tasks yet</p><p className="mt-1 text-sm text-muted-foreground">Start the example above to see it here.</p></div> : <div className="divide-y">{tasks.slice(0, 5).map((task) => <Link key={task.task_id} to={`/tasks/${task.task_id}`} className="flex items-center justify-between gap-4 py-4 hover:bg-muted/40"><div className="min-w-0"><p className="truncate font-mono text-xs text-muted-foreground">{task.task_id}</p><p className="mt-1 text-sm font-medium">Example task</p></div><span className="text-xs text-muted-foreground">{task.status}</span></Link>)}</div>}
+        {loading ? <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" />Loading tasks…</div> : tasks.length === 0 ? <div className="py-8 text-center"><Play className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-3 text-sm font-medium">No tasks yet</p><p className="mt-1 text-sm text-muted-foreground">Start the example above to see it here.</p></div> : <div className="divide-y">{tasks.slice(0, 5).map((task) => <Link key={task.task_id} to={`/tasks/${task.task_id}`} className="flex items-center justify-between gap-4 py-4 hover:bg-muted/40"><div className="min-w-0"><p className="truncate text-sm font-medium">{taskLabel(task.task_name)}</p><p className="mt-1 truncate font-mono text-xs text-muted-foreground">{task.task_id}</p></div><span className="text-xs text-muted-foreground">{taskStatusLabel(task.status)}</span></Link>)}</div>}
       </CardContent>
     </Card>
   </div>;

@@ -50,6 +50,26 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  beat:
+    build:
+      context: ./backend
+      target: production
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: ${PYTHON_PACKAGE:-config}.settings
+      DJANGO_DEBUG: "false"
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: django-db
+    command: ["celery", "-A", "${PYTHON_PACKAGE:-config}", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_grace_period: 30s
+    restart: unless-stopped
+
   db:
     image: postgres:16-alpine
     environment:
@@ -87,7 +107,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "${APP_PORT:-8081}:80"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
       interval: 20s
@@ -110,7 +130,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     command: ["sh", "-c", "if [ -z \"$${FLOWER_USER}\" ] || [ -z \"$${FLOWER_PASSWORD}\" ]; then echo 'Set FLOWER_USER and FLOWER_PASSWORD to enable production Flower.' >&2; exit 1; fi; exec celery -A ${PYTHON_PACKAGE:-config} flower --address=0.0.0.0 --port=5555 --basic-auth=\"$${FLOWER_USER}:$${FLOWER_PASSWORD}\""]
     ports:
-      - "127.0.0.1:${FLOWER_PORT:-5555}:5555"
+      - "127.0.0.1:${FLOWER_PORT:-5556}:5555"
     depends_on:
       db:
         condition: service_healthy

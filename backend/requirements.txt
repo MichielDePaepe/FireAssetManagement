@@ -8,3 +8,6 @@ flower>=2.0,<3
 psycopg[binary]>=3.2,<3.3
 uvicorn[standard]>=0.34,<0.35
 python-dotenv>=1.0,<2
+cryptography>=48,<51
+Pillow>=11.3,<13
+brother-label==2.0a8

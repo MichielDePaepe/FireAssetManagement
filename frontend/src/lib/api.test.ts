@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { subscribeToTask, type TaskSnapshot } from "@/lib/api";
+import { api, subscribeToTask, type TaskSnapshot } from "@/lib/api";
 
 class MockEventSource extends EventTarget {
   static latest: MockEventSource;
@@ -44,5 +44,27 @@ describe("task SSE client", () => {
     expect(onError).toHaveBeenCalledOnce();
     expect(MockEventSource.latest.closed).toBe(false);
     stop();
+  });
+});
+
+describe("Fireplan sync API", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("queues a sync through the staff endpoint with session credentials", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: async () => ({ task_id: "fireplan-task-42", status: "PENDING" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api.startFireplanSync()).resolves.toEqual({
+      task_id: "fireplan-task-42",
+      status: "PENDING",
+    });
+    expect(fetchMock).toHaveBeenCalledWith("/api/fireplan/sync-pagers/", expect.objectContaining({
+      method: "POST",
+      credentials: "include",
+    }));
   });
 });

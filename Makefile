@@ -9,12 +9,12 @@ help:
 dev: ## Start the complete development environment with reload enabled
 	@test -f .env || cp .env.example .env
 	$(DEV_COMPOSE) up --build -d
-	@echo "Development app and Flower are available on the ports configured in .env (defaults: 5173 and 5555)."
+	@echo "Development app and Flower are available on the ports configured in .env (defaults: 5174 and 5556)."
 
 prod: ## Start the production stack (HTTP by default; optional TLS profile is documented)
 	@test -f .env || (echo "Create .env from .env.example and set production secrets first." && exit 1)
 	$(COMPOSE) up --build -d
-	@echo "Production HTTP app is available on APP_PORT from .env (default: 8080)."
+	@echo "Production HTTP app is available on APP_PORT from .env (default: 8081)."
 
 prod-https: ## Add Caddy HTTPS; requires HTTPS_DOMAIN, ACME_EMAIL, and reachable ports 80/443
 	@test -f .env || (echo "Create .env and configure HTTPS_DOMAIN and ACME_EMAIL first." && exit 1)
