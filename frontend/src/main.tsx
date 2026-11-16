@@ -16,6 +16,7 @@ const FireplanSettingsPage = lazy(() => import("@/pages/FireplanSettingsPage").t
 const LabelPrintersPage = lazy(() => import("@/pages/LabelPrintersPage").then((module) => ({ default: module.LabelPrintersPage })));
 const CityGISPage = lazy(() => import("@/pages/CityGISPage").then((module) => ({ default: module.CityGISPage })));
 const InventoryPage = lazy(() => import("@/pages/InventoryPage").then((module) => ({ default: module.InventoryPage })));
+const LocationsPage = lazy(() => import("@/pages/LocationsPage").then((module) => ({ default: module.LocationsPage })));
 
 document.title = import.meta.env.VITE_APP_TITLE || "Web Project Starter";
 
@@ -45,6 +46,7 @@ function App() {
         <Route path="labelprinters" element={<LabelPrintersPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="citygis" element={<CityGISPage />} />
+        <Route path="locations" element={<LocationsPage />} />
       </Route>
     </Route></Route>
     <Route path="*" element={<Navigate to="/" replace />} />

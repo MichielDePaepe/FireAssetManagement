@@ -1,7 +1,7 @@
 ---
 title: Pager Asset Management
 status: in-progress
-current-phase: 13
+current-phase: 14
 repo: private
 github: ~
 created: 2026-11-14
@@ -22,7 +22,7 @@ Add a staff-managed label-printer module to the pager asset application. Initial
 - [x] Phase 10: Registration and relationship management
 - [x] Phase 11: Documentation and verification
 - [x] Phase 12: Location management API
-- [ ] Phase 13: Location tree and post overview UI
+- [x] Phase 13: Location tree and post overview UI
 - [ ] Phase 14: Documentation and verification
 
 ## Specs

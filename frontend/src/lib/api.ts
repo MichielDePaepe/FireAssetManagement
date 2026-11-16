@@ -60,6 +60,25 @@ export interface CityGISLocation {
   service_id: number | null;
 }
 
+export type LocationKind = CityGISLocation["kind"];
+
+export interface LocationServiceOption extends CityGISService {
+  location_id: number | null;
+}
+
+export interface LocationValues {
+  name: string;
+  kind: LocationKind;
+  parent_id: number | null;
+  service_id: number | null;
+}
+
+export interface LocationOverview {
+  location: CityGISLocation;
+  service: CityGISService | null;
+  vectors: CityGISVector[];
+}
+
 export interface CityGISVehicle {
   id: number;
   managed_object: ManagedObjectIdentity;
@@ -283,6 +302,15 @@ export const api = {
   deletePager: (id: number) => request<void>(`/pagers/${id}/`, { method: "DELETE" }),
   listRicCodes: () => request<RicCode[]>("/ric-codes/"),
   getInventory: () => request<InventorySnapshot>("/inventory/"),
+  listLocations: () => request<CityGISLocation[]>("/locations/"),
+  listLocationServices: () => request<LocationServiceOption[]>("/locations/services/"),
+  createLocation: (values: LocationValues) =>
+    request<CityGISLocation>("/locations/", { method: "POST", body: JSON.stringify(values) }),
+  updateLocation: (id: number, values: LocationValues) =>
+    request<CityGISLocation>(`/locations/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
+  deleteLocation: (id: number) => request<void>(`/locations/${id}/`, { method: "DELETE" }),
+  getLocationOverview: (id: number) =>
+    request<LocationOverview>(`/locations/${id}/overview/`),
   updatePagerVector: (pagerId: number, vectorId: number | null) =>
     request<{ vector_id: number | null }>(`/inventory/pagers/${pagerId}/vector/`, {
       method: "PUT",

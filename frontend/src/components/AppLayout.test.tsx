@@ -30,6 +30,7 @@ describe("AppLayout printer navigation", () => {
     );
     expect(screen.getByRole("link", { name: "Inventaris" })).toHaveAttribute("href", "/inventory");
     expect(screen.getByRole("link", { name: "CityGIS" })).toHaveAttribute("href", "/citygis");
+    expect(screen.getByRole("link", { name: "Locaties" })).toHaveAttribute("href", "/locations");
   });
 
   it("hides the label-printer link from non-staff users", () => {
@@ -46,5 +47,6 @@ describe("AppLayout printer navigation", () => {
     expect(screen.queryByRole("link", { name: "Labelprinters" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Inventaris" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "CityGIS" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Locaties" })).not.toBeInTheDocument();
   });
 });
