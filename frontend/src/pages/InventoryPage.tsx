@@ -1,5 +1,7 @@
 import { ArrowDown, ArrowDownUp, ArrowUp } from "lucide-react";
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
+import { PagerScanControl } from "@/components/PagerScanControl";
 import { api, type InventorySnapshot } from "@/lib/api";
 import {
   InventoryRelationshipDialog,
@@ -246,6 +248,16 @@ export function InventoryPage() {
     }
   };
 
+  const scanPager = async (rawScan: string) => {
+    try {
+      const result = await api.scanPager(rawScan);
+      await refresh();
+      setSelection({ kind: "pager", id: result.pager.id });
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "De pager kon niet via de scan worden gevonden.");
+    }
+  };
+
   if (loading) return <p role="status" className="text-sm text-muted-foreground">Inventaris laden…</p>;
   if (error && !snapshot) return <ErrorMessage message={error} />;
   if (!snapshot) return null;
@@ -282,23 +294,25 @@ export function InventoryPage() {
           <p className="text-sm font-medium text-primary">Assetbeheer</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Inventaris</h1>
         </div>
-        <label className="grid gap-1 text-sm font-medium" htmlFor="managed-object-type">
-          Type managed object
-          <select
-            id="managed-object-type"
-            className="h-10 min-w-52 border border-input bg-background px-3 text-sm"
-            value={objectType}
-            onChange={(event) => {
-              const nextType = event.target.value as ManagedObjectType;
-              setObjectType(nextType);
-              setSortColumn(inventoryColumns[nextType][0].key);
-              setSortDirection("ascending");
-              setQuery("");
-            }}
-          >
-            {objectTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
-          </select>
-        </label>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="grid gap-1 text-sm font-medium" htmlFor="managed-object-type">
+            Type managed object
+            <select
+              id="managed-object-type"
+              className="h-10 min-w-52 border border-input bg-background px-3 text-sm"
+              value={objectType}
+              onChange={(event) => {
+                const nextType = event.target.value as ManagedObjectType;
+                setObjectType(nextType);
+                setSortColumn(inventoryColumns[nextType][0].key);
+                setSortDirection("ascending");
+                setQuery("");
+              }}
+            >
+              {objectTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+            </select>
+          </label>
+        </div>
       </header>
 
       {error && !selection && <ErrorMessage message={error} />}
@@ -309,18 +323,21 @@ export function InventoryPage() {
             <h2 className="font-semibold">{typeLabel}</h2>
             <p className="text-sm text-muted-foreground">{rows.length} objecten</p>
           </div>
-          <label className="relative w-full sm:w-72">
-            <span className="sr-only">Zoek objecten</span>
-            <input
-              id="inventory-search"
-              type="search"
-              className="h-9 w-full border border-input bg-background px-3 text-sm"
-              placeholder={`Zoek in ${typeLabel.toLocaleLowerCase("nl-BE")}…`}
-              aria-label="Zoek objecten"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <label className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+              <span className="sr-only">Zoek objecten</span>
+              <input
+                id="inventory-search"
+                type="search"
+                className="h-9 w-full border border-input bg-background px-3 text-sm"
+                placeholder={`Zoek in ${typeLabel.toLocaleLowerCase("nl-BE")}…`}
+                aria-label="Zoek objecten"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            {objectType === "pager" && <PagerScanControl onScan={scanPager} />}
+          </div>
         </div>
         {rows.length ? (
           <div className="overflow-x-auto">

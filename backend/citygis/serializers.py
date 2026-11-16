@@ -103,7 +103,7 @@ class LocationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Location
-        fields = ["id", "name", "kind", "parent_id", "service_id"]
+        fields = ["id", "name", "sort_name", "kind", "parent_id", "service_id"]
 
 
 class LocationManagementSerializer(serializers.ModelSerializer):
@@ -118,7 +118,7 @@ class LocationManagementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Location
-        fields = ["id", "name", "kind", "parent_id", "service_id"]
+        fields = ["id", "name", "sort_name", "kind", "parent_id", "service_id"]
         read_only_fields = ["id"]
 
     def to_internal_value(self, data):

@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { InventoryPage } from "@/pages/InventoryPage";
@@ -11,16 +12,19 @@ vi.mock("@/lib/api", async (importOriginal) => {
     api: {
       ...actual.api,
       getInventory: vi.fn(),
+      scanPager: vi.fn(),
       updatePagerVector: vi.fn(),
       updateRicCodeVector: vi.fn(),
     },
   };
 });
 
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
 const inventory = {
   locations: [
-    { id: 1, name: "Post Anderlecht", kind: "post" as const, parent_id: null, service_id: 1 },
-    { id: 2, name: "Dispatch", kind: "room" as const, parent_id: null, service_id: 2 },
+    { id: 1, name: "Post Anderlecht", sort_name: "", kind: "post" as const, parent_id: null, service_id: 1 },
+    { id: 2, name: "Dispatch", sort_name: "", kind: "room" as const, parent_id: null, service_id: 2 },
   ],
   vectors: [
     {
@@ -31,7 +35,7 @@ const inventory = {
       abbreviation: "P-AND2",
       service_abbreviation: "AND",
       service: { id: 1, abbreviation: "AND" },
-      post: { id: 1, name: "Post Anderlecht", kind: "post" as const, parent_id: null, service_id: 1 },
+      post: { id: 1, name: "Post Anderlecht", sort_name: "", kind: "post" as const, parent_id: null, service_id: 1 },
       resource_type_code: "APM",
       resource_code: "SOURCE-CODE",
       operational_status_code: "3",
@@ -130,8 +134,86 @@ describe("InventoryPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedApi.getInventory.mockResolvedValue(inventory);
+    mockedApi.scanPager.mockResolvedValue({ raw_scan: "QR-1", pager: inventory.pagers[0] });
     mockedApi.updatePagerVector.mockResolvedValue({ vector_id: 10 });
     mockedApi.updateRicCodeVector.mockResolvedValue({ vector_id: 10 });
+  });
+
+  it("opens the existing pager dialog after scanning a registered pager", async () => {
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+    await screen.findByRole("heading", { name: "Inventaris" });
+
+    await user.click(screen.getByRole("button", { name: "Scanmodus inschakelen" }));
+    await user.type(screen.getByLabelText("Scaninvoer"), "QR-1{Enter}");
+
+    expect(await screen.findByRole("dialog", { name: "Pager SN-1" })).toBeInTheDocument();
+    expect(mockedApi.scanPager).toHaveBeenCalledWith("QR-1");
+  });
+
+  it("shows an error toast when a scanned pager cannot be resolved", async () => {
+    const user = userEvent.setup();
+    mockedApi.scanPager.mockRejectedValueOnce(new Error("Onbekende QR-code."));
+    render(<InventoryPage />);
+    await screen.findByRole("heading", { name: "Inventaris" });
+
+    await user.click(screen.getByRole("button", { name: "Scanmodus inschakelen" }));
+    await user.type(screen.getByLabelText("Scaninvoer"), "QR-UNKNOWN{Enter}");
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Onbekende QR-code."));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("links a scanned free pager from a vector dialog and refreshes inventory", async () => {
+    const user = userEvent.setup();
+    mockedApi.scanPager.mockResolvedValueOnce({ raw_scan: "QR-2", pager: inventory.pagers[1] });
+    render(<InventoryPage />);
+    await screen.findByRole("heading", { name: "Inventaris" });
+    await user.selectOptions(screen.getByRole("combobox", { name: "Type managed object" }), "vector");
+    await user.click(screen.getByRole("button", { name: "Beheer koppelingen voor vector P-AND2" }));
+    const dialog = screen.getByRole("dialog", { name: "Vector P-AND2" });
+
+    await user.click(within(dialog).getByRole("button", { name: "Scanmodus inschakelen" }));
+    await user.type(within(dialog).getByLabelText("Scaninvoer"), "QR-2{Enter}");
+
+    await waitFor(() => expect(mockedApi.updatePagerVector).toHaveBeenCalledWith(2, 10));
+    await waitFor(() => expect(mockedApi.getInventory).toHaveBeenCalledTimes(2));
+  });
+
+  it("refuses to move a scanned pager that is already linked elsewhere", async () => {
+    const user = userEvent.setup();
+    mockedApi.getInventory.mockResolvedValueOnce({
+      ...inventory,
+      pagers: inventory.pagers.map((pager) => ({ ...pager, assigned_vector_id: pager.id === 1 ? 11 : null })),
+    });
+    mockedApi.scanPager.mockResolvedValueOnce({ raw_scan: "QR-1", pager: inventory.pagers[0] });
+    render(<InventoryPage />);
+    await screen.findByRole("heading", { name: "Inventaris" });
+    await user.selectOptions(screen.getByRole("combobox", { name: "Type managed object" }), "vector");
+    await user.click(screen.getByRole("button", { name: "Beheer koppelingen voor vector P-AND2" }));
+    const dialog = screen.getByRole("dialog", { name: "Vector P-AND2" });
+
+    await user.click(within(dialog).getByRole("button", { name: "Scanmodus inschakelen" }));
+    await user.type(within(dialog).getByLabelText("Scaninvoer"), "QR-1{Enter}");
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Deze pager is niet vrij en wordt niet verplaatst."));
+    expect(mockedApi.updatePagerVector).not.toHaveBeenCalled();
+  });
+
+  it("shows an error for an unknown scan in a vector dialog", async () => {
+    const user = userEvent.setup();
+    mockedApi.scanPager.mockRejectedValueOnce(new Error("Onbekende QR-code."));
+    render(<InventoryPage />);
+    await screen.findByRole("heading", { name: "Inventaris" });
+    await user.selectOptions(screen.getByRole("combobox", { name: "Type managed object" }), "vector");
+    await user.click(screen.getByRole("button", { name: "Beheer koppelingen voor vector P-AND2" }));
+    const dialog = screen.getByRole("dialog", { name: "Vector P-AND2" });
+
+    await user.click(within(dialog).getByRole("button", { name: "Scanmodus inschakelen" }));
+    await user.type(within(dialog).getByLabelText("Scaninvoer"), "QR-UNKNOWN{Enter}");
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Onbekende QR-code."));
+    expect(mockedApi.updatePagerVector).not.toHaveBeenCalled();
   });
 
   it("lets staff choose an object type and search its compact list", async () => {

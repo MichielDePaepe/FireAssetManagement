@@ -14,6 +14,7 @@ const locationKinds: Array<{ value: LocationKind; label: string }> = [
 
 interface LocationFormState {
   name: string;
+  sort_name: string;
   kind: LocationKind;
   parent_id: string;
   service_id: string;
@@ -21,15 +22,24 @@ interface LocationFormState {
 
 const emptyForm: LocationFormState = {
   name: "",
+  sort_name: "",
   kind: "other",
   parent_id: "",
   service_id: "",
 };
 
 function sortLocations(rows: CityGISLocation[]): CityGISLocation[] {
-  return [...rows].sort((left, right) =>
-    left.name.localeCompare(right.name, "nl-BE", { sensitivity: "base", numeric: true }) || left.id - right.id,
-  );
+  const compare = (left: string, right: string) =>
+    left.localeCompare(right, "nl-BE", { sensitivity: "base", numeric: true });
+  return [...rows].sort((left, right) => {
+    const leftSortName = left.sort_name.trim();
+    const rightSortName = right.sort_name.trim();
+    if (leftSortName && !rightSortName) return -1;
+    if (!leftSortName && rightSortName) return 1;
+    return (leftSortName && rightSortName ? compare(leftSortName, rightSortName) : 0)
+      || compare(left.name, right.name)
+      || left.id - right.id;
+  });
 }
 
 function getDescendantIds(locationId: number, rows: CityGISLocation[]): Set<number> {
@@ -197,6 +207,7 @@ export function LocationsPage() {
     setEditingLocation(location);
     setForm({
       name: location.name,
+      sort_name: location.sort_name,
       kind: location.kind,
       parent_id: location.parent_id === null ? "" : String(location.parent_id),
       service_id: location.service_id === null ? "" : String(location.service_id),
@@ -220,6 +231,7 @@ export function LocationsPage() {
     }
     const values: LocationValues = {
       name,
+      sort_name: form.sort_name.trim(),
       kind: form.kind,
       parent_id: form.parent_id ? Number(form.parent_id) : null,
       service_id: form.kind === "post" && form.service_id ? Number(form.service_id) : null,
@@ -326,14 +338,24 @@ export function LocationsPage() {
                   {parentOptions.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
                 </select>
               </label>
-              {form.kind === "post" && <div className="space-y-2 text-sm font-medium">
-                <label htmlFor="location-service">CityGIS-dienst</label>
-                <select id="location-service" aria-invalid={Boolean(formError)} aria-describedby={formError ? "location-service-help location-form-error" : "location-service-help"} className="h-10 w-full border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={form.service_id} onChange={(event) => setForm((current) => ({ ...current, service_id: event.target.value }))}>
-                  <option value="">Geen dienst</option>
-                  {serviceOptions.map((service) => <option key={service.id} value={service.id}>{service.abbreviation}</option>)}
-                </select>
+              {form.kind === "post" && <div className="space-y-2">
+                <label className="block space-y-2 text-sm font-medium" htmlFor="location-service">
+                  CityGIS-dienst
+                  <select id="location-service" aria-invalid={Boolean(formError)} aria-describedby={formError ? "location-service-help location-form-error" : "location-service-help"} className="h-10 w-full border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={form.service_id} onChange={(event) => setForm((current) => ({ ...current, service_id: event.target.value }))}>
+                    <option value="">Geen dienst</option>
+                    {serviceOptions.map((service) => <option key={service.id} value={service.id}>{service.abbreviation}</option>)}
+                  </select>
+                </label>
+                <p id="location-service-help" role="note" className="text-xs font-normal text-muted-foreground">Diensten worden door CityGIS beheerd.</p>
               </div>}
-              {form.kind === "post" && <p id="location-service-help" role="note" className="-mt-2 text-xs font-normal text-muted-foreground sm:col-span-2">Diensten worden door CityGIS beheerd.</p>}
+              <details className="sm:col-span-2">
+                <summary className="cursor-pointer text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Geavanceerde opties</summary>
+                <label className="mt-4 block space-y-2 text-sm font-medium" htmlFor="location-sort-name">
+                  Sorteernaam
+                  <Input id="location-sort-name" maxLength={160} aria-describedby="location-sort-name-help" value={form.sort_name} onChange={(event) => setForm((current) => ({ ...current, sort_name: event.target.value }))} />
+                </label>
+                <p id="location-sort-name-help" className="mt-1 text-xs text-muted-foreground">Wordt gebruikt voor de volgorde binnen hetzelfde niveau. Zonder sorteernaam volgt de locatie na locaties met een sorteernaam.</p>
+              </details>
               {formError && <div id="location-form-error" role="alert" className="border-l-2 border-red-500 bg-red-50 p-3 text-sm text-red-800 sm:col-span-2">{formError}</div>}
               <div className="flex gap-2 sm:col-span-2">
                 <Button type="submit" disabled={saving}>{saving ? "Opslaan…" : "Opslaan"}</Button>

@@ -37,7 +37,7 @@ class LocationManagementAPITests(TestCase):
         listing = self.api.get(reverse("location-list"))
         created = self.api.post(
             reverse("location-list"),
-            {"name": "New post", "kind": "post", "parent_id": self.root.pk},
+            {"name": "New post", "sort_name": "North 2", "kind": "post", "parent_id": self.root.pk},
             format="json",
         )
         updated = self.api.patch(
@@ -48,10 +48,21 @@ class LocationManagementAPITests(TestCase):
 
         self.assertEqual(listing.status_code, 200)
         self.assertEqual(len(listing.json()), 3)
+        root_row = next(row for row in listing.json() if row["id"] == self.root.pk)
+        self.assertEqual(root_row["sort_name"], "")
         self.assertEqual(created.status_code, 201)
         self.assertEqual(created.json()["parent_id"], self.root.pk)
+        self.assertEqual(created.json()["sort_name"], "North 2")
         self.assertEqual(updated.status_code, 200)
         self.assertEqual(updated.json()["name"], "Updated root")
+
+        sort_name_update = self.api.patch(
+            reverse("location-detail", args=[self.root.pk]),
+            {"sort_name": "Head office"},
+            format="json",
+        )
+        self.assertEqual(sort_name_update.status_code, 200)
+        self.assertEqual(sort_name_update.json()["sort_name"], "Head office")
 
     def test_parent_updates_reject_self_and_descendant_cycles(self):
         self.api.force_login(self.staff)

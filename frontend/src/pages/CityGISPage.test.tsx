@@ -14,7 +14,7 @@ const snapshot: CityGISSnapshot = {
   vectors: [{
     id: 10, managed_object: { id: 10, kind: "vector" }, vector_code: "PBANDE02P", name: "AP AND2", abbreviation: "P-AND2",
     service_abbreviation: "AND", resource_type_code: "APM", resource_code: "1-CYX-076",
-    service: { id: 1, abbreviation: "AND" }, post: { id: 1, name: "Post Anderlecht", kind: "post", parent_id: null, service_id: 1 },
+    service: { id: 1, abbreviation: "AND" }, post: { id: 1, name: "Post Anderlecht", sort_name: "", kind: "post", parent_id: null, service_id: 1 },
     operational_status_code: "3", status_description: "Ter plaatse", status_abbreviation: "Ter pl.",
     status_updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), status_color: "#FF0000", vehicle: {
       id: 1, managed_object: { id: 1, kind: "vehicle" }, fireplan_id: 42, alphacode: "P8", plate: "1-ABC-123", utilisation: "Ambulance",

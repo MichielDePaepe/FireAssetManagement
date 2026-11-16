@@ -53,6 +53,7 @@ class Location(models.Model):
         OTHER = "other", "Other"
 
     name = models.CharField(max_length=160)
+    sort_name = models.CharField(max_length=160, blank=True, default="")
     kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.OTHER)
     parent = models.ForeignKey(
         "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children"

@@ -18,6 +18,7 @@ vi.mock("@/lib/api", () => ({
 interface LocationRecord {
   id: number;
   name: string;
+  sort_name: string;
   kind: "post" | "building" | "room" | "other";
   parent_id: number | null;
   service_id: number | null;
@@ -25,6 +26,7 @@ interface LocationRecord {
 
 interface LocationValues {
   name: string;
+  sort_name: string;
   kind: LocationRecord["kind"];
   parent_id: number | null;
   service_id: number | null;
@@ -59,10 +61,10 @@ const locationApi = api as typeof api & {
 };
 
 const locations: LocationRecord[] = [
-  { id: 1, name: "Post Noord", kind: "post", parent_id: null, service_id: 10 },
-  { id: 2, name: "Gebouw A", kind: "building", parent_id: 1, service_id: null },
-  { id: 3, name: "Lokaal 1", kind: "room", parent_id: 2, service_id: null },
-  { id: 4, name: "Ongekoppelde post", kind: "post", parent_id: null, service_id: null },
+  { id: 1, name: "Post Noord", sort_name: "Hoofdpost", kind: "post", parent_id: null, service_id: 10 },
+  { id: 2, name: "Gebouw A", sort_name: "", kind: "building", parent_id: 1, service_id: null },
+  { id: 3, name: "Lokaal 1", sort_name: "", kind: "room", parent_id: 2, service_id: null },
+  { id: 4, name: "Ongekoppelde post", sort_name: "", kind: "post", parent_id: null, service_id: null },
 ];
 
 const services: ServiceOption[] = [
@@ -114,12 +116,33 @@ describe("LocationsPage", () => {
     expect(screen.getByRole("heading", { name: "Gebouw A" })).toBeInTheDocument();
   });
 
+  it("sorts siblings by sort name, then name, with blank sort names last", async () => {
+    const orderedLocations: LocationRecord[] = [
+      { id: 10, name: "Naam B", sort_name: "Groep 2", kind: "other", parent_id: null, service_id: null },
+      { id: 11, name: "Naam A", sort_name: "Groep 2", kind: "other", parent_id: null, service_id: null },
+      { id: 12, name: "Lege sortering", sort_name: "  ", kind: "other", parent_id: null, service_id: null },
+      { id: 13, name: "Groep tien", sort_name: "Groep 10", kind: "other", parent_id: null, service_id: null },
+      { id: 14, name: "Groep twee", sort_name: "Groep 2", kind: "other", parent_id: null, service_id: null },
+      { id: 15, name: "A lege sortering", sort_name: "", kind: "other", parent_id: null, service_id: null },
+    ];
+    vi.mocked(locationApi.listLocations).mockResolvedValueOnce(orderedLocations);
+    render(<LocationsPage />);
+
+    const tree = await screen.findByRole("tree", { name: "Locatiehiërarchie" });
+    expect(within(tree).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Groep twee", "Naam A", "Naam B", "Groep tien", "A lege sortering", "Lege sortering",
+    ]);
+  });
+
   it("creates a child post and maps an available CityGIS service", async () => {
     const user = userEvent.setup();
     render(<LocationsPage />);
 
     await user.click(await screen.findByRole("button", { name: "Locatie toevoegen" }));
+    expect(screen.getByText("Geavanceerde opties").closest("details")).not.toHaveAttribute("open");
     await user.type(screen.getByLabelText("Naam"), "Post Zuid");
+    await user.click(screen.getByText("Geavanceerde opties"));
+    await user.type(screen.getByLabelText("Sorteernaam"), "Post 2");
     await user.selectOptions(screen.getByLabelText("Type"), "post");
     await user.selectOptions(screen.getByLabelText("Bovenliggende locatie"), "1");
     await user.selectOptions(screen.getByLabelText("CityGIS-dienst"), "11");
@@ -127,6 +150,7 @@ describe("LocationsPage", () => {
 
     await waitFor(() => expect(locationApi.createLocation).toHaveBeenCalledWith({
       name: "Post Zuid",
+      sort_name: "Post 2",
       kind: "post",
       parent_id: 1,
       service_id: 11,
@@ -140,6 +164,9 @@ describe("LocationsPage", () => {
     const tree = await screen.findByRole("tree", { name: "Locatiehiërarchie" });
     await user.click(within(tree).getByRole("button", { name: "Post Noord" }));
     await user.click(await screen.findByRole("button", { name: "Locatie bewerken Post Noord" }));
+    expect(screen.getByText("Geavanceerde opties").closest("details")).not.toHaveAttribute("open");
+    await user.click(screen.getByText("Geavanceerde opties"));
+    expect(screen.getByLabelText("Sorteernaam")).toHaveValue("Hoofdpost");
     expect(screen.getByLabelText("Bovenliggende locatie")).toHaveValue("");
     expect(screen.queryByRole("option", { name: "Post Noord" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Gebouw A" })).not.toBeInTheDocument();
@@ -149,6 +176,7 @@ describe("LocationsPage", () => {
 
     await waitFor(() => expect(locationApi.updateLocation).toHaveBeenCalledWith(1, {
       name: "Post Noord vernieuwd",
+      sort_name: "Hoofdpost",
       kind: "post",
       parent_id: null,
       service_id: 10,

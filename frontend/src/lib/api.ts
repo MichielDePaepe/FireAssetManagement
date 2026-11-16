@@ -55,6 +55,7 @@ export interface CityGISService {
 export interface CityGISLocation {
   id: number;
   name: string;
+  sort_name: string;
   kind: "post" | "building" | "room" | "other";
   parent_id: number | null;
   service_id: number | null;
@@ -68,6 +69,7 @@ export interface LocationServiceOption extends CityGISService {
 
 export interface LocationValues {
   name: string;
+  sort_name: string;
   kind: LocationKind;
   parent_id: number | null;
   service_id: number | null;
@@ -197,6 +199,11 @@ export interface InventorySnapshot {
   ric_codes: InventoryRicCode[];
 }
 
+export interface PagerScanLookup {
+  raw_scan: string;
+  pager: Pager;
+}
+
 export interface LabelPrinter {
   id: number;
   name: string;
@@ -302,6 +309,11 @@ export const api = {
   deletePager: (id: number) => request<void>(`/pagers/${id}/`, { method: "DELETE" }),
   listRicCodes: () => request<RicCode[]>("/ric-codes/"),
   getInventory: () => request<InventorySnapshot>("/inventory/"),
+  scanPager: (scannedLine: string) =>
+    request<PagerScanLookup>("/pagers/scanlookup/", {
+      method: "POST",
+      body: JSON.stringify({ scanned_line: scannedLine }),
+    }),
   listLocations: () => request<CityGISLocation[]>("/locations/"),
   listLocationServices: () => request<LocationServiceOption[]>("/locations/services/"),
   createLocation: (values: LocationValues) =>

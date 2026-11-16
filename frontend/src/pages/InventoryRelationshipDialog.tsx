@@ -1,6 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { PagerScanControl } from "@/components/PagerScanControl";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 import type {
   CityGISVector,
   InventoryPager,
@@ -180,6 +183,7 @@ function RelationshipColumn({
   searchLabel,
   emptyText,
   actionLabel,
+  searchActions,
   items,
   saving,
   onSelect,
@@ -188,6 +192,7 @@ function RelationshipColumn({
   searchLabel: string;
   emptyText: string;
   actionLabel: (item: RelationshipItem) => string;
+  searchActions?: ReactNode;
   items: RelationshipItem[];
   saving: (id: number) => boolean;
   onSelect: (id: number) => void;
@@ -200,16 +205,19 @@ function RelationshipColumn({
     <section aria-label={title} className="flex min-h-64 min-w-0 flex-col border">
       <div className="border-b p-3">
         <h3 className="font-medium">{title} <span className="text-xs font-normal text-muted-foreground">({items.length})</span></h3>
-        <label htmlFor={`relationship-search-${searchLabel.replaceAll(" ", "-")}`} className="sr-only">{searchLabel}</label>
-        <input
-          id={`relationship-search-${searchLabel.replaceAll(" ", "-")}`}
-          type="search"
-          aria-label={searchLabel}
-          placeholder="Zoeken…"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="mt-2 h-9 w-full border border-input bg-background px-3 text-sm"
-        />
+        <div className="mt-2 flex items-center gap-2">
+          <label htmlFor={`relationship-search-${searchLabel.replaceAll(" ", "-")}`} className="sr-only">{searchLabel}</label>
+          <input
+            id={`relationship-search-${searchLabel.replaceAll(" ", "-")}`}
+            type="search"
+            aria-label={searchLabel}
+            placeholder="Zoeken…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="h-9 min-w-0 flex-1 border border-input bg-background px-3 text-sm"
+          />
+          {searchActions}
+        </div>
       </div>
       {visible.length ? (
         <ul aria-label={`${title} resultaten`} className="max-h-[min(50vh,32rem)] flex-1 overflow-y-auto">
@@ -264,6 +272,23 @@ function VectorRelationshipManager({
   }));
   const togglePager = (id: number, linked: boolean) => void onSavePager(id, linked ? null : vector.id);
   const toggleCode = (id: number, linked: boolean) => void onSaveRic(id, linked ? null : vector.id);
+  const scanFreePager = async (rawScan: string) => {
+    try {
+      const { pager } = await api.scanPager(rawScan);
+      const currentPager = snapshot.pagers.find((item) => item.id === pager.id);
+      if (!currentPager) {
+        toast.error("Deze pager staat niet in de inventaris.");
+        return;
+      }
+      if (currentPager.assigned_vector_id !== null) {
+        toast.error("Deze pager is niet vrij en wordt niet verplaatst.");
+        return;
+      }
+      await onSavePager(pager.id, vector.id);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "De pager kon niet via de scan worden gevonden.");
+    }
+  };
   const service = vector.service?.abbreviation || vector.service_abbreviation || "Geen dienst";
   const post = vector.post?.kind === "post" ? vector.post.name : "Zonder post";
   const vehicle = vector.vehicle
@@ -292,6 +317,7 @@ function VectorRelationshipManager({
             title="Vrije pagers"
             searchLabel="Zoek vrije pagers"
             emptyText="Geen vrije pagers."
+            searchActions={<PagerScanControl onScan={scanFreePager} />}
             items={pagerItems(snapshot.pagers.filter((pager) => pager.assigned_vector_id === null))}
             saving={(id) => saving === `pager-${id}`}
             actionLabel={(item) => `Koppel pager ${item.title} aan ${label}`}
