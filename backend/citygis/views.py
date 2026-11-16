@@ -7,18 +7,81 @@ from django.http import HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_GET
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import CityGISSyncState, Vector, VectorStatus, VectorStatusHistory, Vehicle
+from .models import (
+    CityGISSyncState,
+    Location,
+    Service,
+    Vector,
+    VectorStatus,
+    VectorStatusHistory,
+    Vehicle,
+)
 from .serializers import (
+    LocationManagementSerializer,
+    LocationSerializer,
+    ServiceOptionSerializer,
+    ServiceSerializer,
     VectorSerializer,
     VectorStatusHistorySerializer,
     VectorStatusSerializer,
     VehicleSerializer,
 )
 from .tasks import refresh_citygis
+
+
+class LocationViewSet(viewsets.ModelViewSet):
+    """Staff management for local location records and their parent hierarchy."""
+
+    queryset = Location.objects.select_related("parent", "service").prefetch_related("children")
+    serializer_class = LocationManagementSerializer
+    permission_classes = [IsAdminUser]
+
+    @action(detail=False, methods=["get"], url_path="services")
+    def service_options(self, request):
+        services = Service.objects.select_related("location").all()
+        return Response(ServiceOptionSerializer(services, many=True).data)
+
+    @action(detail=True, methods=["get"], url_path="overview")
+    def overview(self, request, pk=None):
+        location = self.get_object()
+        service = location.service if location.kind == Location.Kind.POST else None
+        vectors = (
+            Vector.objects.select_related("service", "vehicle")
+            .filter(service=service, is_current=True)
+            .order_by("service_abbreviation", "vector_code")
+            if service
+            else Vector.objects.none()
+        )
+        statuses = {row.code: row for row in VectorStatus.objects.all()}
+        return Response(
+            {
+                "location": LocationSerializer(location).data,
+                "service": ServiceSerializer(service).data if service else None,
+                "vectors": VectorSerializer(
+                    vectors, many=True, context={"status_catalog": statuses}
+                ).data,
+            }
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        location = self.get_object()
+        if location.children.exists():
+            return Response(
+                {"detail": "Verwijder eerst de onderliggende locaties."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if location.service_id:
+            return Response(
+                {"detail": "Koppel eerst de CityGIS-dienst los."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 def build_citygis_snapshot() -> dict:

@@ -1,7 +1,7 @@
 ---
 title: Pager Asset Management
-status: done
-current-phase: 11
+status: in-progress
+current-phase: 13
 repo: private
 github: ~
 created: 2026-11-14
@@ -21,9 +21,13 @@ Add a staff-managed label-printer module to the pager asset application. Initial
 - [x] Phase 9: Source synchronization and relationship history
 - [x] Phase 10: Registration and relationship management
 - [x] Phase 11: Documentation and verification
+- [x] Phase 12: Location management API
+- [ ] Phase 13: Location tree and post overview UI
+- [ ] Phase 14: Documentation and verification
 
 ## Specs
 - specs/2026-11-13-labelprinter-module.md (bootstrap) → phases 1-2
 - specs/2026-11-14-fireplan-pager-synchronization.md (extension) → phases 3-4
 - specs/2026-11-14-citygis-module.md (extension) → phases 5-7
 - specs/2026-11-15-generiek-inventarisbeheer.md (extension) → phases 8-11
+- specs/2026-11-16-locatiebeheer.md (extension) → phases 12-14

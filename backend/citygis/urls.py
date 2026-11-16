@@ -1,13 +1,18 @@
 from django.urls import path
+from rest_framework.routers import DefaultRouter
 
 from .views import (
     CityGISDataView,
     CityGISRefreshView,
     CityGISVectorStatusHistoryView,
+    LocationViewSet,
     citygis_events,
 )
 
-urlpatterns = [
+router = DefaultRouter()
+router.register("locations", LocationViewSet, basename="location")
+
+urlpatterns = router.urls + [
     path("citygis/", CityGISDataView.as_view(), name="citygis-data"),
     path(
         "citygis/vectors/<int:vector_id>/status-history/",

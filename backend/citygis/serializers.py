@@ -86,6 +86,17 @@ class ServiceSerializer(serializers.ModelSerializer):
         fields = ["id", "abbreviation"]
 
 
+class ServiceOptionSerializer(ServiceSerializer):
+    location_id = serializers.SerializerMethodField()
+
+    class Meta(ServiceSerializer.Meta):
+        fields = ["id", "abbreviation", "location_id"]
+
+    def get_location_id(self, obj):
+        location = getattr(obj, "location", None)
+        return location.pk if location else None
+
+
 class LocationSerializer(serializers.ModelSerializer):
     parent_id = serializers.IntegerField(read_only=True)
     service_id = serializers.IntegerField(read_only=True)
@@ -93,6 +104,68 @@ class LocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location
         fields = ["id", "name", "kind", "parent_id", "service_id"]
+
+
+class LocationManagementSerializer(serializers.ModelSerializer):
+    """Writable local location fields; CityGIS services remain read-only records."""
+
+    parent_id = serializers.PrimaryKeyRelatedField(
+        source="parent", queryset=Location.objects.all(), allow_null=True, required=False
+    )
+    service_id = serializers.PrimaryKeyRelatedField(
+        source="service", queryset=Service.objects.all(), allow_null=True, required=False
+    )
+
+    class Meta:
+        model = Location
+        fields = ["id", "name", "kind", "parent_id", "service_id"]
+        read_only_fields = ["id"]
+
+    def to_internal_value(self, data):
+        unknown_fields = set(data) - set(self.fields)
+        if unknown_fields:
+            raise serializers.ValidationError(
+                {
+                    field: "Dit veld kan niet via locatiebeheer worden aangepast."
+                    for field in unknown_fields
+                }
+            )
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        instance = self.instance
+        kind = attrs.get("kind", instance.kind if instance else Location.Kind.OTHER)
+        parent = attrs.get("parent", instance.parent if instance else None)
+        service = attrs.get("service", instance.service if instance else None)
+
+        if service and kind != Location.Kind.POST:
+            raise serializers.ValidationError(
+                {"service_id": "Alleen posten kunnen een dienst hebben."}
+            )
+
+        if service:
+            existing = Location.objects.filter(service=service)
+            if instance:
+                existing = existing.exclude(pk=instance.pk)
+            if existing.exists():
+                raise serializers.ValidationError(
+                    {"service_id": "Deze dienst is al aan een locatie gekoppeld."}
+                )
+
+        if instance:
+            ancestor = parent
+            while ancestor is not None:
+                if ancestor.pk == instance.pk:
+                    raise serializers.ValidationError(
+                        {
+                            "parent_id": (
+                                "Een locatie kan geen ouder zijn van zichzelf of een voorouder."
+                            )
+                        }
+                    )
+                ancestor = ancestor.parent
+
+        return attrs
 
 
 class VectorSerializer(serializers.ModelSerializer):
