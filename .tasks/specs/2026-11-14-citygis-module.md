@@ -35,7 +35,7 @@ phases:
 
 ### Goal and scope
 
-Add a CityGIS module to Pager Asset Management to show operational dispatch vectors, their associated physical fleet vehicles, and current vector status. Treat CityGIS files already present in the working tree as an unverified prototype: inspect them critically and replace or correct them as needed. Do not assume they were tested or that their current behavior is approved. Preserve unrelated existing work.
+Add a CityGIS module to Fire Asset Management to show operational dispatch vectors, their associated physical fleet vehicles, and current vector status. Treat CityGIS files already present in the working tree as an unverified prototype: inspect them critically and replace or correct them as needed. Do not assume they were tested or that their current behavior is approved. Preserve unrelated existing work.
 
 The first release is read-only apart from synchronization. Pager codes and pager assets are not linked to vectors in this scope. Do not add CityGIS write operations or a separate event bus/task framework.
 

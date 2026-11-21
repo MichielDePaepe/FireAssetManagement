@@ -158,7 +158,7 @@ Bij een same-origin browserclient beheert de browser de cookies. Een server-naar
 
 De actuele implementatie staat in `backend/fireplan/client.py` (`authenticate_and_read_profile`, `session_from_profile`), `backend/fireplan/cookies.py`, `backend/accounts/api.py` (Romeo207 API login/CSRF) en `backend/config/settings.py` (Fireplan-host, TLS en cookiebeveiliging).
 
-## Fireplan-module in Pager Asset Management
+## Fireplan-module in Fire Asset Management
 
 De module **Beheer → Fireplan** in deze toepassing bewaart het Fireplan-wachtwoord en de cookiejar versleuteld in PostgreSQL met de aparte omgevingssleutel `FIREPLAN_CREDENTIAL_KEY`. Een geldige sessie wordt eerst hergebruikt; alleen wanneer de beschermde startpagina de sessie niet meer bevestigt, meldt de toepassing opnieuw aan. De sleutel wordt niet in de database opgeslagen. Bewaar dezelfde sleutel veilig en herstel die samen met een databaseback-up. Deze module legt de aanmeldbasis; het ophalen en synchroniseren van Fireplan-inventarisgegevens is een volgende stap.
 

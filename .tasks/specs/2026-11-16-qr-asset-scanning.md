@@ -33,7 +33,7 @@ phases:
 
 ### Goal and scope
 
-Add reusable QR scanning to Pager Asset Management, starting with pagers. Support a hand scanner that behaves as a keyboard on computers and camera scanning on phones and tablets. The first release uses scanning in two places: the general inventory pager list and the free-pager list inside a vector's relationship dialog.
+Add reusable QR scanning to Fire Asset Management, starting with pagers. Support a hand scanner that behaves as a keyboard on computers and camera scanning on phones and tablets. The first release uses scanning in two places: the general inventory pager list and the free-pager list inside a vector's relationship dialog.
 
 For the general inventory list, a successful scan opens the same pager relationship-management dialog as selecting that pager in the table. In a vector dialog, a successful scan of a free pager immediately links it to the open vector. A pager that is unknown, invalid, or not in the free-pager list produces an error toast; scanning must never silently move a pager from another vector.
 

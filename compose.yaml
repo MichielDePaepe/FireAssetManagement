@@ -1,4 +1,4 @@
-name: ${PROJECT_NAME:-web-project-starter}
+name: ${PROJECT_NAME:-fire-asset-management}
 
 services:
   api:
@@ -102,7 +102,7 @@ services:
       context: ./frontend
       target: production
       args:
-        APP_TITLE: ${APP_TITLE:-Web Project Starter}
+        APP_TITLE: ${APP_TITLE:-Fire Asset Management}
     depends_on:
       api:
         condition: service_healthy

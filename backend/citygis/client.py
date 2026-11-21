@@ -72,7 +72,7 @@ def fetch_fireplan_vehicles(login: str, password: str, cookie_data: str | None):
     url = urljoin(f"{base_url}/", "fr/api/charroi/vehicle/active/list")
     request = Request(
         url,
-        headers={"Accept": "application/json", "User-Agent": "PagerAssetManagement/1.0"},
+        headers={"Accept": "application/json", "User-Agent": "FireAssetManagement/1.0"},
     )
     try:
         with opener.open(request, timeout=20) as response:
@@ -142,7 +142,7 @@ def fetch_resource_vectors(login: str, password: str) -> list[dict]:
     opener = build_opener(_SameOriginRedirectHandler(origin), HTTPCookieProcessor(cookies))
     form = urlencode({"username": login, "password": password}).encode()
     headers = {
-        "User-Agent": "PagerAssetManagement/1.0",
+        "User-Agent": "FireAssetManagement/1.0",
         "Accept": "application/json, text/plain, */*",
     }
     try:

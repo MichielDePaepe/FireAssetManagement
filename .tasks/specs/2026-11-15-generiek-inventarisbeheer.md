@@ -45,7 +45,7 @@ phases:
 
 ### Goal and scope
 
-Extend Pager Asset Management into a reusable inventory register for the physical assets and operational objects already present in the application. The initial release covers pagers, vehicles, vectors, locations/posts, services, and RiC/AdC records. Keep the model ready for later asset types such as radios, trackers, tablets, intelligent cabinets, and cabinet positions/slots, each with structured type-specific data and processes. Do not implement those future types now.
+Extend Fire Asset Management into a reusable inventory register for the physical assets and operational objects already present in the application. The initial release covers pagers, vehicles, vectors, locations/posts, services, and RiC/AdC records. Keep the model ready for later asset types such as radios, trackers, tablets, intelligent cabinets, and cabinet positions/slots, each with structured type-specific data and processes. Do not implement those future types now.
 
 The first release is for registration and relationships, not physical inventory checks. Later work may compare expected and observed contents, report discrepancies, and attach workflows to correct them. Do not build those later workflows in this extension.
 
