@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, type FireplanInventorySummary } from "@/lib/api";
@@ -125,12 +125,14 @@ export function FireplanInventoriesPage() {
               <div className="overflow-x-auto">
                 <table className="w-full table-fixed border-collapse text-left text-sm">
                   <colgroup>
-                    <col className="w-[12%]" /><col className="w-[18%]" /><col className="w-[16%]" />
-                    <col className="w-[13%]" /><col className="w-[17%]" /><col className="w-[24%]" />
+                    <col className="w-[11%]" /><col className="w-[10%]" /><col className="w-[16%]" />
+                    <col className="w-[14%]" /><col className="w-[13%]" /><col className="w-[17%]" />
+                    <col className="w-[19%]" />
                   </colgroup>
                   <thead className="border-b bg-muted/70 text-xs font-medium text-muted-foreground">
                     <tr>
                       <th scope="col" className="px-3 py-3">Voertuig</th>
+                      <th scope="col" className="px-3 py-3">Vector</th>
                       <th scope="col" className="px-3 py-3">Type</th>
                       <th scope="col" className="px-3 py-3">Post</th>
                       <th scope="col" className="px-3 py-3">Afgesloten</th>
@@ -140,12 +142,19 @@ export function FireplanInventoriesPage() {
                   </thead>
                   <tbody className="divide-y">
                     {loading ? (
-                      <tr><td colSpan={6} role="status" className="px-3 py-8 text-center text-muted-foreground">Inventarissen laden…</td></tr>
+                      <tr><td colSpan={7} role="status" className="px-3 py-8 text-center text-muted-foreground">Inventarissen laden…</td></tr>
                     ) : rows.length === 0 ? (
-                      <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">Geen FirePlan-inventarissen gevonden.</td></tr>
+                      <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Geen FirePlan-inventarissen gevonden.</td></tr>
                     ) : rows.map((row) => (
                       <tr key={row.uuid}>
-                        <td className="truncate px-3 py-3 font-medium" title={row.vehicle_alpha_code}>{row.vehicle_alpha_code || "—"}</td>
+                        <td className="truncate px-3 py-3 font-medium" title={row.vehicle_alpha_code}>
+                          {row.last_successful_sync_at ? (
+                            <Link className="underline-offset-4 hover:underline" to={`/fireplan/inventories/${encodeURIComponent(row.uuid)}`}>
+                              {row.vehicle_alpha_code || row.uuid}
+                            </Link>
+                          ) : row.vehicle_alpha_code || "—"}
+                        </td>
+                        <td className="truncate px-3 py-3" title={row.vector_name}>{row.vector_code || "Onbekend"}</td>
                         <td className="truncate px-3 py-3" title={row.inventory_type_name}>{row.inventory_type_name || "—"}</td>
                         <td className="truncate px-3 py-3" title={row.done_in_name}>{row.done_in_name || "—"}</td>
                         <td className="px-3 py-3">{formatDate(row.closed_at)}</td>

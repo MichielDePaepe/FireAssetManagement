@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     FireplanCredentialsView,
+    FireplanInventoryDetailView,
     FireplanInventoryListView,
     FireplanInventorySyncView,
     FireplanPagerSyncView,
@@ -13,6 +14,11 @@ urlpatterns = [
     path("fireplan/test-login/", FireplanTestLoginView.as_view(), name="fireplan-test-login"),
     path("fireplan/sync-pagers/", FireplanPagerSyncView.as_view(), name="fireplan-sync-pagers"),
     path("fireplan/inventories/", FireplanInventoryListView.as_view(), name="fireplan-inventories"),
+    path(
+        "fireplan/inventories/<str:inventory_uuid>/",
+        FireplanInventoryDetailView.as_view(),
+        name="fireplan-inventory-detail",
+    ),
     path(
         "fireplan/sync-inventories/",
         FireplanInventorySyncView.as_view(),

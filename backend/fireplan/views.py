@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
@@ -14,6 +15,7 @@ from .client import (
 from .crypto import FireplanEncryptionError, decrypt_secret, encrypt_secret
 from .inventory_client import FireplanInventoryClient
 from .inventory_mapping import parse_fireplan_datetime
+from .inventory_relationships import resolve_inventory_relationship
 from .models import FireplanCredential, FireplanInventory
 from .tasks import synchronize_inventories, synchronize_pagers
 
@@ -228,11 +230,21 @@ class FireplanInventoryListView(APIView):
 
         inventory_uuids = [row["uuid"] for row in source_rows]
         local_rows = {
-            row.uuid: row for row in FireplanInventory.objects.filter(uuid__in=inventory_uuids)
+            row.uuid: row
+            for row in FireplanInventory.objects.filter(uuid__in=inventory_uuids).select_related(
+                "vector"
+            )
         }
         results = []
         for row in source_rows:
             local = local_rows.get(row["uuid"])
+            closed_at = parse_fireplan_datetime(row["closedAt"])
+            if local and local.last_successful_sync_at:
+                vector = local.vector
+            else:
+                vector = resolve_inventory_relationship(
+                    row.get("vehicleAlphaCode") or "", closed_at
+                ).vector
             results.append(
                 {
                     "uuid": row["uuid"],
@@ -244,7 +256,9 @@ class FireplanInventoryListView(APIView):
                     "created_at": parse_fireplan_datetime(row["createdAt"])
                     if row.get("createdAt")
                     else None,
-                    "closed_at": parse_fireplan_datetime(row["closedAt"]),
+                    "closed_at": closed_at,
+                    "vector_code": vector.vector_code if vector else None,
+                    "vector_name": vector.name if vector else "",
                     "updated_at": parse_fireplan_datetime(row["updatedAt"])
                     if row.get("updatedAt")
                     else None,
@@ -260,6 +274,68 @@ class FireplanInventoryListView(APIView):
                 }
             )
         return Response({"count": total, "page": page, "page_size": page_size, "results": results})
+
+
+class FireplanInventoryDetailView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, inventory_uuid):
+        inventory = get_object_or_404(
+            FireplanInventory.objects.select_related("vehicle", "vector").prefetch_related(
+                "radio_observations"
+            ),
+            uuid=inventory_uuid,
+            last_successful_sync_at__isnull=False,
+        )
+        return Response(
+            {
+                "uuid": inventory.uuid,
+                "vehicle_alpha_code": inventory.vehicle_alpha_code,
+                "inventory_type_name": inventory.inventory_type_name,
+                "done_in_name": inventory.done_in_name,
+                "done_by_full_name": inventory.done_by_full_name,
+                "overseen_by_full_name": inventory.overseen_by_full_name,
+                "source_created_at": inventory.source_created_at,
+                "source_closed_at": inventory.source_closed_at,
+                "source_updated_at": inventory.source_updated_at,
+                "has_incident_reports": inventory.has_incident_reports,
+                "is_complete_after_completion": inventory.is_complete_after_completion,
+                "is_complete_before_completion": inventory.is_complete_before_completion,
+                "is_quantity_count_excluded": inventory.is_quantity_count_excluded,
+                "is_test_standard": inventory.is_test_standard,
+                "remaining_missing_followed_count": inventory.remaining_missing_followed_count,
+                "vehicle": (
+                    {
+                        "alphacode": inventory.vehicle.alphacode,
+                        "fireplan_id": inventory.vehicle.fireplan_id,
+                    }
+                    if inventory.vehicle_id
+                    else None
+                ),
+                "vector": (
+                    {
+                        "vector_code": inventory.vector.vector_code,
+                        "name": inventory.vector.name,
+                        "abbreviation": inventory.vector.abbreviation,
+                    }
+                    if inventory.vector_id
+                    else None
+                ),
+                "sync_status": inventory.sync_status,
+                "last_attempted_at": inventory.last_attempted_at,
+                "last_successful_sync_at": inventory.last_successful_sync_at,
+                "last_error": inventory.last_error,
+                "radio_items": inventory.radio_items,
+                "radio_observations": [
+                    {
+                        "fireplan_item_id": observation.fireplan_item_id,
+                        "item_type_id": observation.item_type_id,
+                        "serial_number": observation.serial_number,
+                    }
+                    for observation in inventory.radio_observations.all()
+                ],
+            }
+        )
 
 
 class FireplanInventorySyncView(APIView):

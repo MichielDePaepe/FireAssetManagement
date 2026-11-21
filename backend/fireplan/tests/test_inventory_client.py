@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from urllib.parse import parse_qs, urlsplit
 
@@ -9,8 +10,6 @@ from fireplan.inventory_client import FireplanInventoryClient
 
 class FakeResponse:
     def __init__(self, body: dict, url: str) -> None:
-        import json
-
         self.body = json.dumps(body).encode()
         self.url = url
 
@@ -85,7 +84,8 @@ def test_inventory_summary_client_paginates_and_validates_source_rows(inventory_
 
     assert [row["uuid"] for row in records] == ["inv-1", "inv-2"]
     assert len(opener.requests) == 2
-    assert parse_qs(urlsplit(opener.requests[0][0].full_url).query)["sortField"] == ["closedAt"]
+    query = parse_qs(urlsplit(opener.requests[0][0].full_url).query)
+    assert json.loads(query["multiSortMeta"][0]) == [{"field": "closedAt", "order": -1}]
 
 
 def test_inventory_summary_page_client_fetches_one_requested_page(inventory_client):
@@ -103,7 +103,7 @@ def test_inventory_summary_page_client_fetches_one_requested_page(inventory_clie
     assert len(opener.requests) == 1
 
 
-def test_inventory_summary_client_filters_inclusive_local_period_and_stops_before_start(
+def test_inventory_summary_client_filters_inclusive_local_period_across_all_pages(
     inventory_client,
 ):
     client, opener = inventory_client
@@ -114,11 +114,17 @@ def test_inventory_summary_client_filters_inclusive_local_period_and_stops_befor
             [
                 source_record("inv-after", "2026-11-21 00:00:00"),
                 source_record("inv-end", "2026-11-20 23:59:59"),
-                source_record("inv-start", "2026-11-20 00:00:00"),
-                source_record("inv-before", "2026-11-19 23:59:59"),
             ],
-            100,
-        )
+            4,
+        ),
+        response(
+            base,
+            [
+                source_record("inv-before", "2026-11-19 23:59:59"),
+                source_record("inv-start", "2026-11-20 00:00:00"),
+            ],
+            4,
+        ),
     ]
 
     records = client.fetch_inventory_summaries(
@@ -126,7 +132,7 @@ def test_inventory_summary_client_filters_inclusive_local_period_and_stops_befor
     )
 
     assert [row["uuid"] for row in records] == ["inv-end", "inv-start"]
-    assert len(opener.requests) == 1
+    assert len(opener.requests) == 2
 
 
 def test_inventory_summary_client_rejects_invalid_required_fields(inventory_client):

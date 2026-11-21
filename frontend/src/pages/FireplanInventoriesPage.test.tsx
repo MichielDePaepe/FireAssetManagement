@@ -3,18 +3,20 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
-import type { FireplanInventoryPage } from "@/lib/api";
+import type { FireplanInventoryDetail, FireplanInventoryPage } from "@/lib/api";
 import { FireplanInventoriesPage } from "@/pages/FireplanInventoriesPage";
+import { FireplanInventoryDetailPage } from "@/pages/FireplanInventoryDetailPage";
 
 vi.mock("@/lib/api", () => ({
   api: {
     getFireplanInventories: vi.fn(),
+    getFireplanInventoryDetail: vi.fn(),
     startFireplanInventorySync: vi.fn(),
   },
 }));
 
 const inventoryPage: FireplanInventoryPage = {
-  count: 1,
+  count: 2,
   page: 1,
   page_size: 25,
   results: [
@@ -37,8 +39,58 @@ const inventoryPage: FireplanInventoryPage = {
       sync_status: "not_synced",
       last_successful_sync_at: null,
       last_error: "",
+      vector_code: "V-HISTORY",
+      vector_name: "History",
+    },
+    {
+      uuid: "inv-synced",
+      vehicle_alpha_code: "AMB-2",
+      inventory_type_name: "Inventory close",
+      done_in_name: "Post B",
+      done_by_full_name: "Operator B",
+      overseen_by_full_name: "Supervisor B",
+      created_at: "2026-11-20T08:00:00+01:00",
+      closed_at: "2026-11-20T09:00:00+01:00",
+      updated_at: "2026-11-20T09:00:00+01:00",
+      has_incident_reports: false,
+      is_complete_after_completion: true,
+      is_complete_before_completion: false,
+      is_quantity_count_excluded: false,
+      is_test_standard: false,
+      remaining_missing_followed_count: 0,
+      sync_status: "synced",
+      last_successful_sync_at: "2026-11-20T10:00:00+01:00",
+      last_error: "",
+      vector_code: "V-LOCAL",
+      vector_name: "Local vector",
     },
   ],
+};
+
+const inventoryDetail: FireplanInventoryDetail = {
+  uuid: "inv-synced",
+  vehicle_alpha_code: "AMB-2",
+  inventory_type_name: "Inventory close",
+  done_in_name: "Post B",
+  done_by_full_name: "Operator B",
+  overseen_by_full_name: "Supervisor B",
+  source_created_at: "2026-11-20T08:00:00+01:00",
+  source_closed_at: "2026-11-20T09:00:00+01:00",
+  source_updated_at: "2026-11-20T09:00:00+01:00",
+  has_incident_reports: false,
+  is_complete_after_completion: true,
+  is_complete_before_completion: false,
+  is_quantity_count_excluded: false,
+  is_test_standard: false,
+  remaining_missing_followed_count: 0,
+  vehicle: { alphacode: "AMB-2", fireplan_id: 502 },
+  vector: { vector_code: "V-LOCAL", name: "Local vector", abbreviation: "LV" },
+  sync_status: "failed",
+  last_attempted_at: "2026-11-21T09:00:00+01:00",
+  last_successful_sync_at: "2026-11-20T10:00:00+01:00",
+  last_error: "FirePlan tijdelijk onbeschikbaar",
+  radio_items: [{ fireplan_item_id: "item-1", serial_number: "00001234" }],
+  radio_observations: [{ fireplan_item_id: "item-1", item_type_id: 1010, serial_number: "00001234" }],
 };
 
 function renderPage() {
@@ -46,6 +98,7 @@ function renderPage() {
     <MemoryRouter initialEntries={["/fireplan/inventories"]}>
       <Routes>
         <Route path="/fireplan/inventories" element={<FireplanInventoriesPage />} />
+        <Route path="/fireplan/inventories/:inventoryUuid" element={<FireplanInventoryDetailPage />} />
         <Route path="/tasks/:taskId" element={<p>Taakdetail <span data-testid="task-id" /></p>} />
       </Routes>
     </MemoryRouter>,
@@ -56,6 +109,7 @@ describe("FireplanInventoriesPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.getFireplanInventories).mockResolvedValue(inventoryPage);
+    vi.mocked(api.getFireplanInventoryDetail).mockResolvedValue(inventoryDetail);
   });
 
   it("shows loading, source rows, unsynced status, and the updatedAt limitation", async () => {
@@ -72,6 +126,32 @@ describe("FireplanInventoriesPage", () => {
     expect(screen.getByText("Niet gesynchroniseerd")).toBeInTheDocument();
     expect(screen.getByText(/updatedAt.*niet bevestigd/)).toBeInTheDocument();
     expect(api.getFireplanInventories).toHaveBeenCalledWith(1, 25);
+  });
+
+  it("shows stored and historical vectors and only links synced inventories", async () => {
+    renderPage();
+
+    expect(await screen.findByText("V-HISTORY")).toBeInTheDocument();
+    expect(screen.getByText("V-LOCAL")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /AMB-2/ })).toHaveAttribute(
+      "href",
+      "/fireplan/inventories/inv-synced",
+    );
+    expect(screen.queryByRole("link", { name: /AMB-1/ })).not.toBeInTheDocument();
+  });
+
+  it("opens the local snapshot and formats the stored radio JSON", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("link", { name: /AMB-2/ }));
+
+    expect(await screen.findByRole("heading", { name: "FirePlan-inventaris" })).toBeInTheDocument();
+    expect(api.getFireplanInventoryDetail).toHaveBeenCalledWith("inv-synced");
+    expect(screen.getByRole("alert")).toHaveTextContent("FirePlan tijdelijk onbeschikbaar");
+    expect(screen.getByText(/"serial_number": "00001234"/)).toBeInTheDocument();
+    expect(screen.getByText("V-LOCAL")).toBeInTheDocument();
+    expect(screen.getByText("00001234")).toBeInTheDocument();
   });
 
   it("shows empty and API error states", async () => {

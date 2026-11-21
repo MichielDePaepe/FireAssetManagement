@@ -1,9 +1,9 @@
 ---
 phase: 24
 title: Lokale inventarisdetailpagina
-status: pending
-opened: ~
-closed: ~
+status: closed
+opened: 2026-11-21
+closed: 2026-11-21
 ---
 ## Goal
 Laat beheerders de laatst succesvol gesynchroniseerde FirePlan-inventaris en radioresultaten lokaal bekijken, met de overeenkomstige vector in de inventarislijst.
@@ -22,3 +22,5 @@ Laat beheerders de laatst succesvol gesynchroniseerde FirePlan-inventaris en rad
 - Records zonder succesvolle synchronisatie zijn niet openbaar als detail; na een mislukte nieuwe poging blijft de laatste succesvolle snapshot zichtbaar met de foutstatus.
 
 ## Tasks
+- [x] task-01-inventory-detail-and-vector-api.md
+- [x] task-02-inventory-detail-page-and-vector-table.md

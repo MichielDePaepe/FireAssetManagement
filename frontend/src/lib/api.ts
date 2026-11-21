@@ -70,6 +70,38 @@ export interface FireplanInventorySummary {
   sync_status: "not_synced" | "pending" | "running" | "synced" | "failed";
   last_successful_sync_at: string | null;
   last_error: string;
+  vector_code: string | null;
+  vector_name: string;
+}
+
+export interface FireplanInventoryDetail {
+  uuid: string;
+  vehicle_alpha_code: string;
+  inventory_type_name: string;
+  done_in_name: string;
+  done_by_full_name: string;
+  overseen_by_full_name: string;
+  source_created_at: string | null;
+  source_closed_at: string | null;
+  source_updated_at: string | null;
+  has_incident_reports: boolean | null;
+  is_complete_after_completion: boolean | null;
+  is_complete_before_completion: boolean | null;
+  is_quantity_count_excluded: boolean | null;
+  is_test_standard: boolean | null;
+  remaining_missing_followed_count: number | null;
+  vehicle: { alphacode: string; fireplan_id: number } | null;
+  vector: { vector_code: string; name: string; abbreviation: string } | null;
+  sync_status: "pending" | "running" | "synced" | "failed";
+  last_attempted_at: string | null;
+  last_successful_sync_at: string;
+  last_error: string;
+  radio_items: Array<Record<string, unknown>>;
+  radio_observations: Array<{
+    fireplan_item_id: string;
+    item_type_id: number;
+    serial_number: string;
+  }>;
 }
 
 export interface FireplanInventoryPage {
@@ -344,6 +376,8 @@ export const api = {
     request<FireplanInventoryPage>(
       `/fireplan/inventories/?page=${page}&page_size=${pageSize}`,
     ),
+  getFireplanInventoryDetail: (uuid: string) =>
+    request<FireplanInventoryDetail>(`/fireplan/inventories/${encodeURIComponent(uuid)}/`),
   startFireplanInventorySync: (startDate: string, endDate: string) =>
     request<StartedTask>("/fireplan/sync-inventories/", {
       method: "POST",

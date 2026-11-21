@@ -6,8 +6,9 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from django.urls import reverse
 
+from citygis.models import Vector, VectorVehicleHistory, Vehicle
 from fireplan.client import FireplanInventoryError
-from fireplan.models import FireplanCredential, FireplanInventory
+from fireplan.models import FireplanCredential, FireplanInventory, FireplanRadioObservation
 
 pytestmark = pytest.mark.django_db
 
@@ -88,6 +89,102 @@ def test_inventory_list_fetches_one_source_page_and_merges_local_sync_state(admi
     client_class.return_value.fetch_inventory_summaries.assert_not_called()
     client_class.return_value.fetch_inventory_summary_page.assert_called_once_with(first=2, rows=2)
     assert FireplanCredential.objects.get(pk=1).encrypted_cookies == "encrypted:new-cookie-data"
+
+
+def test_inventory_list_uses_stored_vector_for_synced_and_history_for_unsynced(admin_client):
+    FireplanCredential.objects.create(
+        pk=1, login="fireplan-user", encrypted_password="encrypted-password"
+    )
+    vehicle = Vehicle.objects.create(fireplan_id=5001, alphacode="AMB-1")
+    stored_vector = Vector.objects.create(vector_code="V-LOCAL", vehicle=vehicle)
+    historical_vector = Vector.objects.create(vector_code="V-HISTORY")
+    VectorVehicleHistory.objects.create(
+        vector=historical_vector,
+        vehicle=vehicle,
+        observed_at=datetime(2026, 11, 20, 7, 59, tzinfo=UTC),
+    )
+    FireplanInventory.objects.create(
+        uuid="stored-inventory",
+        vehicle_alpha_code="AMB-1",
+        vehicle=vehicle,
+        vector=stored_vector,
+        source_closed_at=datetime(2026, 11, 20, 9, tzinfo=UTC),
+        sync_status=FireplanInventory.SyncStatus.SYNCED,
+        last_successful_sync_at=datetime(2026, 11, 20, 10, tzinfo=UTC),
+    )
+    source_page = Mock()
+    source_page.fetch_inventory_summary_page.return_value = (
+        [source_summary("stored-inventory"), source_summary("new-inventory")],
+        2,
+    )
+    source_page.refreshed_cookie_data.return_value = "cookie-data"
+    with (
+        patch("fireplan.views.decrypt_secret", return_value="plain-secret"),
+        patch("fireplan.views.encrypt_secret", side_effect=lambda value: f"encrypted:{value}"),
+        patch("fireplan.views.FireplanInventoryClient", return_value=source_page),
+    ):
+        response = admin_client.get(reverse("fireplan-inventories"))
+
+    rows = {row["uuid"]: row for row in response.json()["results"]}
+    assert response.status_code == 200
+    assert rows["stored-inventory"]["vector_code"] == "V-LOCAL"
+    assert rows["new-inventory"]["vector_code"] == "V-HISTORY"
+
+
+def test_inventory_detail_returns_saved_snapshot_and_survives_failed_later_attempt(admin_client):
+    vehicle = Vehicle.objects.create(fireplan_id=5001, alphacode="AMB-1")
+    vector = Vector.objects.create(vector_code="V-LOCAL", vehicle=vehicle)
+    inventory = FireplanInventory.objects.create(
+        uuid="stored-inventory",
+        vehicle_alpha_code="AMB-1",
+        vehicle=vehicle,
+        vector=vector,
+        inventory_type_name="Inventory close",
+        done_in_name="Post A",
+        done_by_full_name="Operator",
+        overseen_by_full_name="Supervisor",
+        source_created_at=datetime(2026, 11, 20, 8, tzinfo=UTC),
+        source_closed_at=datetime(2026, 11, 20, 9, tzinfo=UTC),
+        source_updated_at=datetime(2026, 11, 20, 9, tzinfo=UTC),
+        radio_items=[{"fireplan_item_id": "item-1", "serial_number": "00001234"}],
+        sync_status=FireplanInventory.SyncStatus.FAILED,
+        last_attempted_at=datetime(2026, 11, 21, 9, tzinfo=UTC),
+        last_successful_sync_at=datetime(2026, 11, 20, 10, tzinfo=UTC),
+        last_error="FirePlan unavailable",
+    )
+    FireplanRadioObservation.objects.create(
+        inventory=inventory,
+        fireplan_item_id="item-1",
+        item_type_id=1010,
+        serial_number="00001234",
+    )
+
+    response = admin_client.get(reverse("fireplan-inventory-detail", args=[inventory.uuid]))
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["uuid"] == "stored-inventory"
+    assert payload["sync_status"] == "failed"
+    assert payload["last_error"] == "FirePlan unavailable"
+    assert payload["vehicle"]["alphacode"] == "AMB-1"
+    assert payload["vector"]["vector_code"] == "V-LOCAL"
+    assert payload["radio_items"] == [{"fireplan_item_id": "item-1", "serial_number": "00001234"}]
+    assert payload["radio_observations"] == [
+        {"fireplan_item_id": "item-1", "item_type_id": 1010, "serial_number": "00001234"}
+    ]
+
+
+def test_inventory_detail_requires_successful_sync_and_admin_access(admin_client, regular_client):
+    inventory = FireplanInventory.objects.create(uuid="never-synced")
+
+    assert (
+        admin_client.get(reverse("fireplan-inventory-detail", args=[inventory.uuid])).status_code
+        == 404
+    )
+    assert (
+        regular_client.get(reverse("fireplan-inventory-detail", args=[inventory.uuid])).status_code
+        == 403
+    )
 
 
 def test_inventory_list_rejects_invalid_page_parameters(admin_client):

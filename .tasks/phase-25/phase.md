@@ -1,12 +1,18 @@
 ---
 phase: 25
 title: Gerichte hersynchronisatie en afronding
-status: pending
-opened: ~
+status: open
+opened: 2026-11-21
 closed: ~
 ---
 ## Goal
 Laat beheerders één FirePlan-inventaris opnieuw ophalen en verwerken via de bestaande Celery-taakstroom, met behoud van de succesvolle snapshot bij fouten.
+
+## Carry from phase 24
+1. None.
+
+## Open follow-ups from phase 24
+- One live Redis broker integration test remains unrun because the test broker was unavailable.
 
 ## Exit Criteria
 - De detailpagina kan uitsluitend de geselecteerde inventaris opnieuw synchroniseren met bestaande voortgangs- en rapportagefunctionaliteit.
