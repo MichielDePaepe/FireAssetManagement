@@ -25,6 +25,7 @@ export function PagerScanControl({ onScan }: PagerScanControlProps) {
   const generationRef = useRef(0);
   const pendingRef = useRef(false);
   const detectedRef = useRef(false);
+  const submitScanRef = useRef<(rawScan: string) => void>(() => undefined);
 
   useEffect(() => {
     if (keyboardMode) inputRef.current?.focus();
@@ -69,6 +70,10 @@ export function PagerScanControl({ onScan }: PagerScanControlProps) {
     }
   }
 
+  submitScanRef.current = (rawScan) => {
+    void submitScan(rawScan);
+  };
+
   async function setTorch(enabled: boolean) {
     const track = (videoRef.current?.srcObject as MediaStream | null)?.getVideoTracks()[0];
     if (!track) return;
@@ -104,7 +109,7 @@ export function PagerScanControl({ onScan }: PagerScanControlProps) {
         setCameraMode(false);
         setScanFlash(false);
         setTorchEnabled(false);
-        void submitScan(result.getText());
+        submitScanRef.current(result.getText());
       }, 220);
     }).then(async (controls) => {
       if (generationRef.current !== generation) {

@@ -226,7 +226,7 @@ describe("InventoryPage", () => {
     expect(screen.getByRole("button", { name: "Beheer koppelingen voor pager SN-1" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Type/ })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Toegewezen aan/ })).toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "TETRA" })).toBeInTheDocument();
+    expect(screen.getAllByRole("cell", { name: "TETRA" })).toHaveLength(2);
     expect(screen.getByRole("cell", { name: "P-AND2 · Post Anderlecht" })).toBeInTheDocument();
 
     const search = screen.getByRole("searchbox", { name: "Zoek objecten" });
