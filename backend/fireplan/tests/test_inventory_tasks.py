@@ -89,6 +89,26 @@ def test_scheduled_task_uses_selective_mode_and_beat_does_not_store_results(monk
     assert synchronize_inventories.ignore_result is False
 
 
+def test_single_inventory_task_forces_only_the_selected_uuid(monkeypatch):
+    _credential, client, progress, sync = setup_task(monkeypatch)
+    synchronize_inventories.push_request(id="single-inventory-task")
+    try:
+        result = synchronize_inventories.run(inventory_uuid="selected-inventory")
+    finally:
+        synchronize_inventories.pop_request()
+
+    assert result["message"] == "FirePlan-inventarissynchronisatie voltooid."
+    sync.assert_called_once_with(
+        client,
+        start_date=None,
+        end_date=None,
+        force=True,
+        inventory_uuid="selected-inventory",
+        progress_callback=ANY,
+    )
+    assert progress.set_progress.call_count >= 1
+
+
 def test_task_rejects_partial_or_reversed_period_before_network_access(monkeypatch):
     _credential, client, _progress, sync = setup_task(monkeypatch)
 

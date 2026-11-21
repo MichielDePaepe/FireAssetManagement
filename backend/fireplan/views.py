@@ -338,6 +338,50 @@ class FireplanInventoryDetailView(APIView):
         )
 
 
+class FireplanInventoryTargetedSyncView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        request=None,
+        responses={
+            202: inline_serializer(
+                name="FireplanInventoryTargetedSyncAccepted",
+                fields={
+                    "task_id": serializers.CharField(),
+                    "status": serializers.ChoiceField(choices=["PENDING"]),
+                },
+            )
+        },
+    )
+    def post(self, request, inventory_uuid):
+        get_object_or_404(
+            FireplanInventory,
+            uuid=inventory_uuid,
+            last_successful_sync_at__isnull=False,
+        )
+        credential = FireplanCredential.objects.filter(pk=1).first()
+        if not credential or not credential.encrypted_password:
+            return Response(
+                {"detail": "Stel eerst Fireplan-inloggegevens in."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            decrypt_secret(credential.encrypted_password)
+            if credential.encrypted_cookies:
+                deserialize_cookie_jar(decrypt_secret(credential.encrypted_cookies))
+        except (FireplanEncryptionError, FireplanLoginError):
+            return Response(
+                {"detail": "Fireplan-inloggegevens zijn onbruikbaar."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        task = synchronize_inventories.apply_async(kwargs={"inventory_uuid": inventory_uuid})
+        return Response(
+            {"task_id": task.id, "status": "PENDING"},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
 class FireplanInventorySyncView(APIView):
     permission_classes = [IsAdminUser]
 

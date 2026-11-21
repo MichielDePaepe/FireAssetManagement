@@ -12,6 +12,7 @@ vi.mock("@/lib/api", () => ({
     getFireplanInventories: vi.fn(),
     getFireplanInventoryDetail: vi.fn(),
     startFireplanInventorySync: vi.fn(),
+    startFireplanInventoryResync: vi.fn(),
   },
 }));
 
@@ -110,6 +111,10 @@ describe("FireplanInventoriesPage", () => {
     vi.clearAllMocks();
     vi.mocked(api.getFireplanInventories).mockResolvedValue(inventoryPage);
     vi.mocked(api.getFireplanInventoryDetail).mockResolvedValue(inventoryDetail);
+    vi.mocked(api.startFireplanInventoryResync).mockResolvedValue({
+      task_id: "single-inventory-task",
+      status: "PENDING",
+    });
   });
 
   it("shows loading, source rows, unsynced status, and the updatedAt limitation", async () => {
@@ -131,8 +136,11 @@ describe("FireplanInventoriesPage", () => {
   it("shows stored and historical vectors and only links synced inventories", async () => {
     renderPage();
 
-    expect(await screen.findByText("V-HISTORY")).toBeInTheDocument();
-    expect(screen.getByText("V-LOCAL")).toBeInTheDocument();
+    expect(await screen.findByText("History")).toBeInTheDocument();
+    expect(screen.getByText("Local vector")).toBeInTheDocument();
+    expect(screen.queryByText("V-HISTORY")).not.toBeInTheDocument();
+    expect(screen.queryByText("V-LOCAL")).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Type" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /AMB-2/ })).toHaveAttribute(
       "href",
       "/fireplan/inventories/inv-synced",
@@ -152,6 +160,43 @@ describe("FireplanInventoriesPage", () => {
     expect(screen.getByText(/"serial_number": "00001234"/)).toBeInTheDocument();
     expect(screen.getByText("V-LOCAL")).toBeInTheDocument();
     expect(screen.getByText("00001234")).toBeInTheDocument();
+  });
+
+  it("starts a targeted sync from the detail page and opens existing task progress", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("link", { name: /AMB-2/ }));
+    await user.click(await screen.findByRole("button", { name: "Inventaris opnieuw synchroniseren" }));
+
+    await waitFor(() => expect(api.startFireplanInventoryResync).toHaveBeenCalledWith("inv-synced"));
+    expect(await screen.findByText("Taakdetail")).toBeInTheDocument();
+    expect(localStorage.getItem("activeTaskId")).toBe("single-inventory-task");
+  });
+
+  it("disables the sync button while the targeted task is being queued", async () => {
+    const user = userEvent.setup();
+    let resolveTask!: (value: { task_id: string; status: "PENDING" }) => void;
+    vi.mocked(api.startFireplanInventoryResync).mockReturnValue(
+      new Promise((resolve) => { resolveTask = resolve; }),
+    );
+    renderPage();
+    await user.click(await screen.findByRole("link", { name: /AMB-2/ }));
+    const syncButton = await screen.findByRole("button", { name: "Inventaris opnieuw synchroniseren" });
+    await user.click(syncButton);
+
+    expect(syncButton).toBeDisabled();
+    resolveTask({ task_id: "single-inventory-task", status: "PENDING" });
+    expect(await screen.findByText("Taakdetail")).toBeInTheDocument();
+  });
+
+  it("shows a sync-start error accessibly on the detail page", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.startFireplanInventoryResync).mockRejectedValue(new Error("Taak starten mislukt"));
+    renderPage();
+    await user.click(await screen.findByRole("link", { name: /AMB-2/ }));
+    await user.click(await screen.findByRole("button", { name: "Inventaris opnieuw synchroniseren" }));
+
+    expect(await screen.findByText("Taak starten mislukt")).toBeInTheDocument();
   });
 
   it("shows empty and API error states", async () => {

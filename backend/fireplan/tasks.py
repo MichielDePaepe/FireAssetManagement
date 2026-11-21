@@ -103,7 +103,10 @@ def _inventory_period_date(value: str | None) -> date | None:
     time_limit=settings.CELERY_TASK_TIME_LIMIT,
 )
 def synchronize_inventories(
-    self, start_date: str | None = None, end_date: str | None = None
+    self,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    inventory_uuid: str | None = None,
 ) -> dict[str, object]:
     """Run a selective hourly sync or force a complete inclusive date period."""
     period_start = _inventory_period_date(start_date)
@@ -112,9 +115,23 @@ def synchronize_inventories(
         raise ValueError("Begindatum en einddatum moeten samen zijn opgegeven.")
     if period_start and period_end and period_start > period_end:
         raise ValueError("Begindatum mag niet na einddatum liggen.")
+    if inventory_uuid is not None and (
+        not isinstance(inventory_uuid, str)
+        or not inventory_uuid.strip()
+        or period_start is not None
+    ):
+        raise ValueError("Een gerichte inventory-sync vereist één UUID en geen periode.")
 
     progress = ProgressRecorder(self)
-    progress.set_progress(0, 1, description="FirePlan-inventarissen ophalen")
+    progress.set_progress(
+        0,
+        1,
+        description=(
+            "Geselecteerde FirePlan-inventaris ophalen"
+            if inventory_uuid is not None
+            else "FirePlan-inventarissen ophalen"
+        ),
+    )
     credential = FireplanCredential.objects.filter(pk=1).first()
     if not credential or not credential.encrypted_password:
         raise FireplanLoginError("Stel eerst Fireplan-inloggegevens in.")
@@ -124,15 +141,17 @@ def synchronize_inventories(
         decrypt_secret(credential.encrypted_cookies) if credential.encrypted_cookies else None
     )
     client = FireplanInventoryClient(credential.login, password, cookie_data)
-    summary = synchronize_fireplan_inventories(
-        client,
-        start_date=period_start,
-        end_date=period_end,
-        force=period_start is not None,
-        progress_callback=lambda current, total, description: progress.set_progress(
+    sync_options = {
+        "start_date": period_start,
+        "end_date": period_end,
+        "force": period_start is not None or inventory_uuid is not None,
+        "progress_callback": lambda current, total, description: progress.set_progress(
             current, total, description=description
         ),
-    )
+    }
+    if inventory_uuid is not None:
+        sync_options["inventory_uuid"] = inventory_uuid
+    summary = synchronize_fireplan_inventories(client, **sync_options)
 
     credential.encrypted_cookies = encrypt_secret(client.refreshed_cookie_data())
     credential.session_checked_at = timezone.now()

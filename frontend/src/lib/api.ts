@@ -383,6 +383,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ start_date: startDate, end_date: endDate }),
     }),
+  startFireplanInventoryResync: (uuid: string) =>
+    request<StartedTask>(`/fireplan/inventories/${encodeURIComponent(uuid)}/sync/`, {
+      method: "POST",
+    }),
   getTask: (id: string) => request<TaskSnapshot>(`/tasks/${encodeURIComponent(id)}/`),
   taskEventsUrl: (id: string) => `${API_BASE}/tasks/${encodeURIComponent(id)}/events/`,
   listPagers: () => request<Pager[]>("/pagers/"),

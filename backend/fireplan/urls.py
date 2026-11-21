@@ -5,6 +5,7 @@ from .views import (
     FireplanInventoryDetailView,
     FireplanInventoryListView,
     FireplanInventorySyncView,
+    FireplanInventoryTargetedSyncView,
     FireplanPagerSyncView,
     FireplanTestLoginView,
 )
@@ -18,6 +19,11 @@ urlpatterns = [
         "fireplan/inventories/<str:inventory_uuid>/",
         FireplanInventoryDetailView.as_view(),
         name="fireplan-inventory-detail",
+    ),
+    path(
+        "fireplan/inventories/<str:inventory_uuid>/sync/",
+        FireplanInventoryTargetedSyncView.as_view(),
+        name="fireplan-sync-inventory",
     ),
     path(
         "fireplan/sync-inventories/",

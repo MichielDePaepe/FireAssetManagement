@@ -1,6 +1,6 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, type FireplanInventoryDetail } from "@/lib/api";
@@ -24,9 +24,26 @@ function DetailField({ label, value }: { label: string; value: string }) {
 
 export function FireplanInventoryDetailPage() {
   const { inventoryUuid = "" } = useParams();
+  const navigate = useNavigate();
   const [inventory, setInventory] = useState<FireplanInventoryDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [syncStartError, setSyncStartError] = useState("");
+  const [startingSync, setStartingSync] = useState(false);
+
+  const startSync = async () => {
+    setSyncStartError("");
+    setStartingSync(true);
+    try {
+      const task = await api.startFireplanInventoryResync(inventoryUuid);
+      localStorage.setItem("activeTaskId", task.task_id);
+      navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
+    } catch (reason) {
+      setSyncStartError(reason instanceof Error ? reason.message : "Synchronisatie starten is niet gelukt.");
+    } finally {
+      setStartingSync(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -47,10 +64,28 @@ export function FireplanInventoryDetailPage() {
         <Link to="/fireplan/inventories"><ArrowLeft className="h-4 w-4" />Terug naar inventarissen</Link>
       </Button>
       <header>
-        <p className="text-sm font-medium text-primary">Beheer · FirePlan-inventarissen</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">FirePlan-inventaris</h1>
-        <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{inventoryUuid}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-primary">Beheer · FirePlan-inventarissen</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">FirePlan-inventaris</h1>
+            <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{inventoryUuid}</p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="shrink-0 rounded-none"
+            title="Inventaris opnieuw synchroniseren"
+            aria-label="Inventaris opnieuw synchroniseren"
+            disabled={loading || startingSync || Boolean(error)}
+            onClick={() => void startSync()}
+          >
+            <RefreshCw className={`h-4 w-4 ${startingSync ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       </header>
+
+      {syncStartError && <div role="alert" className="border-l-2 border-red-500 bg-red-50 p-4 text-sm text-red-800">{syncStartError}</div>}
 
       {loading ? (
         <div role="status" className="py-8 text-sm text-muted-foreground">Lokale inventarissnapshot laden…</div>

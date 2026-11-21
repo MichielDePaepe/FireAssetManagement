@@ -240,6 +240,57 @@ def test_inventory_period_start_queues_forced_task_with_iso_date_strings(admin_c
     )
 
 
+def test_single_inventory_sync_starts_existing_task_for_only_selected_uuid(admin_client):
+    FireplanCredential.objects.create(
+        pk=1, login="fireplan-user", encrypted_password="encrypted-password"
+    )
+    FireplanInventory.objects.create(
+        uuid="selected-inventory",
+        last_successful_sync_at=datetime(2026, 11, 20, 10, tzinfo=UTC),
+    )
+    with (
+        patch("fireplan.views.decrypt_secret", return_value="plain-secret"),
+        patch("fireplan.views.synchronize_inventories.apply_async") as apply_async,
+    ):
+        apply_async.return_value.id = "inventory-task-456"
+        response = admin_client.post(
+            reverse("fireplan-sync-inventory", args=["selected-inventory"]),
+            content_type="application/json",
+        )
+
+    assert response.status_code == 202
+    assert response.json() == {"task_id": "inventory-task-456", "status": "PENDING"}
+    apply_async.assert_called_once_with(kwargs={"inventory_uuid": "selected-inventory"})
+
+
+def test_single_inventory_sync_rejects_unknown_or_never_synced_records(admin_client):
+    FireplanInventory.objects.create(uuid="never-synced")
+
+    assert (
+        admin_client.post(
+            reverse("fireplan-sync-inventory", args=["missing"]), content_type="application/json"
+        ).status_code
+        == 404
+    )
+    assert (
+        admin_client.post(
+            reverse("fireplan-sync-inventory", args=["never-synced"]),
+            content_type="application/json",
+        ).status_code
+        == 404
+    )
+
+
+def test_single_inventory_sync_requires_admin(regular_client):
+    assert (
+        regular_client.post(
+            reverse("fireplan-sync-inventory", args=["selected-inventory"]),
+            content_type="application/json",
+        ).status_code
+        == 403
+    )
+
+
 def test_inventory_list_reports_missing_credentials_and_source_errors_safely(admin_client):
     assert admin_client.get(reverse("fireplan-inventories")).status_code == 400
     FireplanCredential.objects.create(

@@ -95,12 +95,22 @@ def _validate_radio_items(items: object) -> list[dict]:
     return items
 
 
+def _record_inventory_failure(inventory: FireplanInventory, error: Exception) -> None:
+    inventory.sync_status = FireplanInventory.SyncStatus.FAILED
+    inventory.last_attempted_at = timezone.now()
+    inventory.last_error = str(error)[:500]
+    inventory.save(
+        update_fields=["sync_status", "last_attempted_at", "last_error", "updated_at"]
+    )
+
+
 def synchronize_fireplan_inventories(
     client,
     *,
     start_date: date | None = None,
     end_date: date | None = None,
     force: bool = False,
+    inventory_uuid: str | None = None,
     progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> dict:
     """Synchronize source summaries and selectively process their radio details."""
@@ -108,25 +118,53 @@ def synchronize_fireplan_inventories(
         raise ValueError("Begindatum en einddatum moeten samen zijn opgegeven.")
     if start_date and end_date and start_date > end_date:
         raise ValueError("Begindatum mag niet na einddatum liggen.")
+    if inventory_uuid is not None and (start_date is not None or end_date is not None):
+        raise ValueError(
+            "Een gerichte inventaris-sync kan niet met een periode worden gecombineerd."
+        )
 
     summaries = client.fetch_inventory_summaries(
         start_date=start_date,
         end_date=end_date,
     )
+    if inventory_uuid is not None:
+        summaries = [summary for summary in summaries if summary.get("uuid") == inventory_uuid]
     mapping_version = client.mapping["version"]
     result = {"added": 0, "updated": 0, "skipped": 0, "failed": 0, "errors": []}
     if not summaries:
+        if inventory_uuid is not None:
+            message = "Inventaris niet gevonden in FirePlan."
+            inventory = FireplanInventory.objects.filter(uuid=inventory_uuid).first()
+            if inventory:
+                _record_inventory_failure(inventory, FireplanInventoryError(message))
+            result["failed"] = 1
+            result["errors"].append({"uuid": inventory_uuid, "error": message})
         if progress_callback:
-            progress_callback(0, 1, "Geen FirePlan-inventarissen gevonden")
+            description = (
+                "Inventaris niet gevonden in FirePlan."
+                if inventory_uuid is not None
+                else "Geen FirePlan-inventarissen gevonden"
+            )
+            progress_callback(1 if inventory_uuid is not None else 0, 1, description)
         return result
 
     for index, summary in enumerate(summaries, start=1):
         try:
             defaults = _inventory_defaults(summary)
-            inventory, created = FireplanInventory.objects.update_or_create(
-                uuid=summary["uuid"], defaults=defaults
-            )
+            if inventory_uuid is not None:
+                inventory = FireplanInventory.objects.filter(uuid=summary["uuid"]).first()
+                created = inventory is None
+                if created:
+                    inventory = FireplanInventory.objects.create(uuid=summary["uuid"], **defaults)
+            else:
+                inventory, created = FireplanInventory.objects.update_or_create(
+                    uuid=summary["uuid"], defaults=defaults
+                )
         except (FireplanInventoryError, KeyError, TypeError) as error:
+            if inventory_uuid is not None:
+                inventory = FireplanInventory.objects.filter(uuid=inventory_uuid).first()
+                if inventory:
+                    _record_inventory_failure(inventory, error)
             result["failed"] += 1
             result["errors"].append({"uuid": summary.get("uuid", ""), "error": str(error)[:500]})
             if progress_callback:
@@ -138,6 +176,7 @@ def synchronize_fireplan_inventories(
 
         needs_details = (
             force
+            or inventory_uuid is not None
             or created
             or inventory.mapping_version != mapping_version
             or inventory.sync_status
@@ -162,9 +201,7 @@ def synchronize_fireplan_inventories(
         try:
             radio_items = _validate_radio_items(client.fetch_inventory_radio_items(inventory.uuid))
         except (FireplanInventoryError, ValueError) as error:
-            inventory.sync_status = FireplanInventory.SyncStatus.FAILED
-            inventory.last_error = str(error)[:500]
-            inventory.save(update_fields=["sync_status", "last_error", "updated_at"])
+            _record_inventory_failure(inventory, error)
             result["failed"] += 1
             result["errors"].append({"uuid": inventory.uuid, "error": inventory.last_error})
             if progress_callback:
@@ -175,6 +212,9 @@ def synchronize_fireplan_inventories(
 
         with transaction.atomic():
             inventory = FireplanInventory.objects.select_for_update().get(pk=inventory.pk)
+            if inventory_uuid is not None:
+                for field, value in defaults.items():
+                    setattr(inventory, field, value)
             inventory.radio_observations.all().delete()
             FireplanRadioObservation.objects.bulk_create(
                 [
@@ -195,6 +235,7 @@ def synchronize_fireplan_inventories(
             inventory.save(
                 update_fields=[
                     "radio_items",
+                    *(defaults.keys() if inventory_uuid is not None else []),
                     "mapping_version",
                     "sync_status",
                     "last_successful_sync_at",

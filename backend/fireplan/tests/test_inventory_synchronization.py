@@ -128,6 +128,110 @@ def test_failed_detail_fetch_keeps_last_successful_json_observations_and_time():
     ]
 
 
+def test_failed_targeted_sync_keeps_full_successful_snapshot_and_relationships():
+    client = FakeClient()
+    synchronize_fireplan_inventories(client)
+    inventory = FireplanInventory.objects.get(uuid="inv-1")
+    vehicle = Vehicle.objects.create(fireplan_id=9002, alphacode="SAVED-CODE")
+    vector = Vector.objects.create(vector_code="SAVED-VECTOR", vehicle=vehicle)
+    inventory.vehicle = vehicle
+    inventory.vehicle_fireplan_id = vehicle.fireplan_id
+    inventory.vector = vector
+    inventory.inventory_type_name = "Saved type"
+    inventory.done_in_name = "Saved post"
+    inventory.save()
+    original_snapshot = {
+        "vehicle_alpha_code": inventory.vehicle_alpha_code,
+        "vehicle_id": inventory.vehicle_id,
+        "vehicle_fireplan_id": inventory.vehicle_fireplan_id,
+        "vector_id": inventory.vector_id,
+        "inventory_type_name": inventory.inventory_type_name,
+        "done_in_name": inventory.done_in_name,
+        "source_closed_at": inventory.source_closed_at,
+        "radio_items": inventory.radio_items,
+        "last_successful_sync_at": inventory.last_successful_sync_at,
+    }
+    client.records[0]["vehicleAlphaCode"] = "CHANGED-CODE"
+    client.records[0]["inventoryTypeName"] = "Changed type"
+    client.records[0]["doneInName"] = "Changed post"
+    client.fetch_error = FireplanInventoryError("source temporarily unavailable")
+
+    result = synchronize_fireplan_inventories(
+        client, inventory_uuid="inv-1", force=True
+    )
+
+    inventory.refresh_from_db()
+    assert result["failed"] == 1
+    assert inventory.sync_status == FireplanInventory.SyncStatus.FAILED
+    assert inventory.last_error == "source temporarily unavailable"
+    assert {
+        "vehicle_alpha_code": inventory.vehicle_alpha_code,
+        "vehicle_id": inventory.vehicle_id,
+        "vehicle_fireplan_id": inventory.vehicle_fireplan_id,
+        "vector_id": inventory.vector_id,
+        "inventory_type_name": inventory.inventory_type_name,
+        "done_in_name": inventory.done_in_name,
+        "source_closed_at": inventory.source_closed_at,
+        "radio_items": inventory.radio_items,
+        "last_successful_sync_at": inventory.last_successful_sync_at,
+    } == original_snapshot
+
+
+def test_targeted_sync_processes_only_matching_inventory_uuid():
+    client = FakeClient(records=[summary("selected"), summary("other")])
+    inventory = FireplanInventory.objects.create(
+        uuid="selected",
+        inventory_type_name="Old type",
+        done_in_name="Old post",
+        radio_items=[{"fireplan_item_id": "old", "serial_number": "00000001"}],
+        sync_status=FireplanInventory.SyncStatus.SYNCED,
+        last_successful_sync_at=datetime(2026, 11, 20, 10, tzinfo=UTC),
+    )
+    vehicle = Vehicle.objects.create(fireplan_id=9010, alphacode="NO-MATCH")
+    vector = Vector.objects.create(vector_code="TARGET-HISTORY")
+    VectorVehicleHistory.objects.create(
+        vector=vector,
+        vehicle=vehicle,
+        observed_at=datetime(2026, 11, 20, 7, 59, tzinfo=UTC),
+    )
+    client.records[0]["inventoryTypeName"] = "Updated type"
+    client.records[0]["doneInName"] = "Updated post"
+
+    result = synchronize_fireplan_inventories(
+        client, inventory_uuid="selected", force=True
+    )
+
+    inventory.refresh_from_db()
+    assert client.detail_calls == ["selected"]
+    assert result == {"added": 0, "updated": 1, "skipped": 0, "failed": 0, "errors": []}
+    assert inventory.inventory_type_name == "Updated type"
+    assert inventory.done_in_name == "Updated post"
+    assert inventory.vehicle == vehicle
+    assert inventory.vector == vector
+    assert inventory.radio_items[0]["serial_number"] == "00001234"
+    assert FireplanInventory.objects.filter(uuid="selected").exists()
+    assert not FireplanInventory.objects.filter(uuid="other").exists()
+
+
+def test_targeted_sync_records_invalid_source_metadata_failure_without_mutating_snapshot():
+    client = FakeClient()
+    synchronize_fireplan_inventories(client)
+    inventory = FireplanInventory.objects.get(uuid="inv-1")
+    old_type = inventory.inventory_type_name
+    old_closed_at = inventory.source_closed_at
+    client.records[0]["closedAt"] = "invalid"
+
+    result = synchronize_fireplan_inventories(client, inventory_uuid="inv-1", force=True)
+
+    inventory.refresh_from_db()
+    assert result["failed"] == 1
+    assert inventory.sync_status == FireplanInventory.SyncStatus.FAILED
+    assert inventory.last_error == "Fireplan gaf ongeldige inventarisdatums terug."
+    assert inventory.last_attempted_at is not None
+    assert inventory.inventory_type_name == old_type
+    assert inventory.source_closed_at == old_closed_at
+
+
 def test_forced_period_refetches_every_inventory_inclusive_local_date_range():
     client = FakeClient(
         records=[
