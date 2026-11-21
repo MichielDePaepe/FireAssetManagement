@@ -224,7 +224,10 @@ describe("InventoryPage", () => {
     const typePicker = screen.getByRole("combobox", { name: "Type managed object" });
     expect(typePicker).toHaveValue("pager");
     expect(screen.getByRole("button", { name: "Beheer koppelingen voor pager SN-1" })).toBeInTheDocument();
-    expect(screen.queryByText("P-AND2")).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /Type/ })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /Toegewezen aan/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("cell", { name: "TETRA" })).toHaveLength(2);
+    expect(screen.getByRole("cell", { name: "P-AND2 · Post Anderlecht" })).toBeInTheDocument();
 
     const search = screen.getByRole("searchbox", { name: "Zoek objecten" });
     await user.type(search, "SN-2");
@@ -259,6 +262,31 @@ describe("InventoryPage", () => {
     expect(screen.getByRole("columnheader", { name: /RiC\/AdC/ })).toHaveAttribute("aria-sort", "ascending");
     await user.click(screen.getByRole("button", { name: "Sorteer op RiC/AdC" }));
     expect(screen.getByRole("columnheader", { name: /RiC\/AdC/ })).toHaveAttribute("aria-sort", "descending");
+  });
+
+  it("filters pagers by type and assignment, and keeps an unassigned pager cell blank", async () => {
+    const user = userEvent.setup();
+    mockedApi.getInventory.mockResolvedValueOnce({
+      ...inventory,
+      pagers: inventory.pagers.map((pager) => pager.id === 2 ? { ...pager, type: { id: 2, name: "RES.Q XS" } } : pager),
+    });
+    render(<InventoryPage />);
+    await screen.findByRole("heading", { name: "Inventaris" });
+
+    const freePagerRow = screen.getByRole("button", { name: "Beheer koppelingen voor pager SN-2" }).closest("tr") as HTMLElement;
+    expect(within(freePagerRow).getAllByRole("cell")[2]).toBeEmptyDOMElement();
+
+    const typeHeader = screen.getByRole("columnheader", { name: /Type/ });
+    await user.click(within(typeHeader).getByRole("button", { name: "Open filter voor Type" }));
+    await user.click(within(screen.getByRole("group", { name: "Filter op type" })).getByLabelText("RES.Q XS"));
+    expect(screen.getByRole("button", { name: "Beheer koppelingen voor pager SN-2" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Beheer koppelingen voor pager SN-1" })).not.toBeInTheDocument();
+
+    const assignmentHeader = screen.getByRole("columnheader", { name: /Toegewezen aan/ });
+    await user.click(within(assignmentHeader).getByRole("button", { name: "Open filter voor Toegewezen aan" }));
+    await user.click(within(screen.getByRole("group", { name: "Filter op toegewezen aan" })).getByLabelText("(Leeg)"));
+    expect(screen.getByRole("button", { name: "Beheer koppelingen voor pager SN-2" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Beheer koppelingen voor pager SN-1" })).not.toBeInTheDocument();
   });
 
   it("uses a searchable single-vector choice from a pager and preserves one-link behavior", async () => {

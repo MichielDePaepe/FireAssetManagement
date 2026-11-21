@@ -1,6 +1,7 @@
-import { ArrowDown, ArrowDownUp, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowDownUp, ArrowUp, Filter } from "lucide-react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { PagerScanControl } from "@/components/PagerScanControl";
 import { api, type InventorySnapshot } from "@/lib/api";
 import {
@@ -24,7 +25,8 @@ interface InventoryColumn {
 const inventoryColumns: Record<ManagedObjectType, InventoryColumn[]> = {
   pager: [
     { key: "pager", label: "Pager" },
-    { key: "pager_relation", label: "Vector of type" },
+    { key: "pager_type", label: "Type" },
+    { key: "assigned_to", label: "Toegewezen aan" },
   ],
   vector: [
     { key: "vector", label: "Vector" },
@@ -39,6 +41,43 @@ const inventoryColumns: Record<ManagedObjectType, InventoryColumn[]> = {
     { key: "linked_vector", label: "Gekoppelde vector" },
   ],
 };
+
+const EMPTY_ASSIGNMENT_FILTER = "__empty_assignment__";
+
+interface FilterOption { value: string; label: string }
+
+function FilterPopover({ anchor, label, options, selected, onChange, onClose }: {
+  anchor: HTMLElement;
+  label: string;
+  options: FilterOption[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+  onClose: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  useLayoutEffect(() => {
+    const rect = anchor.getBoundingClientRect();
+    const height = Math.min(panelRef.current?.offsetHeight ?? 320, window.innerHeight - 16);
+    const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - 288));
+    const below = rect.bottom + 4;
+    setPosition({ top: below + height <= window.innerHeight - 8 ? below : Math.max(8, rect.top - height - 4), left });
+  }, [anchor, options.length]);
+  useEffect(() => {
+    const pointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!panelRef.current?.contains(target) && !anchor.contains(target)) onClose();
+    };
+    const keyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", pointerDown);
+    document.addEventListener("keydown", keyDown);
+    return () => { document.removeEventListener("mousedown", pointerDown); document.removeEventListener("keydown", keyDown); };
+  }, [anchor, onClose]);
+  return createPortal(<div ref={panelRef} role="group" aria-label={`Filter op ${label.toLocaleLowerCase("nl-BE")}`} className="fixed z-50 max-h-80 w-[17.5rem] max-w-[calc(100vw-1rem)] overflow-y-auto border bg-white p-3 text-sm text-foreground shadow-lg" style={{ ...position, maxHeight: "min(20rem, calc(100vh - 1rem))" }}>
+    <div className="mb-2 flex items-center justify-between border-b pb-2"><span className="font-semibold">Filter op {label.toLocaleLowerCase("nl-BE")}</span><button type="button" className="px-2 py-1 text-xs text-muted-foreground hover:bg-muted disabled:opacity-50" disabled={!selected.length} onClick={() => { onChange([]); onClose(); }}>Wissen</button></div>
+    <div className="space-y-1">{options.map((option) => <label key={option.value} className="flex cursor-pointer items-center gap-2 px-2 py-1.5 hover:bg-muted"><input type="checkbox" className="h-4 w-4 accent-primary" checked={selected.includes(option.value)} onChange={(event) => { onChange(event.target.checked ? [...selected, option.value] : selected.filter((value) => value !== option.value)); onClose(); }} /><span>{option.label}</span></label>)}{!options.length && <p className="px-2 py-1.5 text-muted-foreground">Geen filteropties beschikbaar.</p>}</div>
+  </div>, document.body);
+}
 
 function vectorLabel(vector: InventorySnapshot["vectors"][number]): string {
   return vector.abbreviation || vector.name || vector.vector_code;
@@ -87,7 +126,8 @@ function InventoryRow({
           onClick={() => onSelect(selection)}
         >{pager.serial_number}</button>
         </td>
-        <td className="px-4 py-3 align-middle text-sm text-muted-foreground">{vector ? `${vectorLabel(vector)} · ${locationForVector(vector)}` : pager.type.name}</td>
+        <td className="px-4 py-3 align-middle text-sm text-muted-foreground">{pager.type.name}</td>
+        <td className="px-4 py-3 align-middle text-sm text-muted-foreground">{vector ? `${vectorLabel(vector)} · ${locationForVector(vector)}` : ""}</td>
       </tr>
     );
   }
@@ -166,7 +206,9 @@ function sortValue(selection: InventorySelection, key: string, snapshot: Invento
     const pager = snapshot.pagers.find((row) => row.id === selection.id);
     if (!pager) return "";
     const vector = snapshot.vectors.find((row) => row.id === pager.assigned_vector_id);
-    return key === "pager" ? pager.serial_number : vector ? `${vectorLabel(vector)} ${locationForVector(vector)}` : pager.type.name;
+    if (key === "pager") return pager.serial_number;
+    if (key === "pager_type") return pager.type.name;
+    return vector ? `${vectorLabel(vector)} ${locationForVector(vector)}` : "";
   }
   if (selection.kind === "vector") {
     const vector = snapshot.vectors.find((row) => row.id === selection.id);
@@ -195,6 +237,9 @@ export function InventoryPage() {
   const [sortColumn, setSortColumn] = useState(inventoryColumns.pager[0].key);
   const [sortDirection, setSortDirection] = useState<"ascending" | "descending">("ascending");
   const [query, setQuery] = useState("");
+  const [typeFilters, setTypeFilters] = useState<string[]>([]);
+  const [assignmentFilters, setAssignmentFilters] = useState<string[]>([]);
+  const [openFilter, setOpenFilter] = useState<{ column: "pager_type" | "assigned_to"; anchor: HTMLElement } | null>(null);
   const [selection, setSelection] = useState<InventorySelection | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -263,9 +308,24 @@ export function InventoryPage() {
   if (!snapshot) return null;
 
   const normalizedQuery = query.trim().toLocaleLowerCase("nl-BE");
-  const matchingRows = objectSelections(objectType, snapshot).filter((row) =>
-    searchText(row, snapshot).toLocaleLowerCase("nl-BE").includes(normalizedQuery),
-  );
+  const pagerTypeOptions = [...new Set(snapshot.pagers.map((pager) => pager.type.name))]
+    .sort((a, b) => a.localeCompare(b, "nl-BE", { numeric: true, sensitivity: "base" }))
+    .map((value) => ({ value, label: value }));
+  const assignmentOptions = [...new Set(snapshot.pagers.map((pager) => {
+    const vector = snapshot.vectors.find((row) => row.id === pager.assigned_vector_id);
+    return vector ? `${vectorLabel(vector)} · ${locationForVector(vector)}` : EMPTY_ASSIGNMENT_FILTER;
+  }))].sort((a, b) => a.localeCompare(b, "nl-BE", { numeric: true, sensitivity: "base" }))
+    .map((value) => ({ value, label: value === EMPTY_ASSIGNMENT_FILTER ? "(Leeg)" : value }));
+  const matchingRows = objectSelections(objectType, snapshot).filter((row) => {
+    if (!searchText(row, snapshot).toLocaleLowerCase("nl-BE").includes(normalizedQuery)) return false;
+    if (row.kind !== "pager") return true;
+    const pager = snapshot.pagers.find((item) => item.id === row.id);
+    if (!pager) return false;
+    const vector = snapshot.vectors.find((item) => item.id === pager.assigned_vector_id);
+    const assigned = vector ? `${vectorLabel(vector)} · ${locationForVector(vector)}` : EMPTY_ASSIGNMENT_FILTER;
+    return (!typeFilters.length || typeFilters.includes(pager.type.name))
+      && (!assignmentFilters.length || assignmentFilters.includes(assigned));
+  });
   const activeSortColumn = inventoryColumns[objectType].find((column) => column.key === sortColumn) ?? inventoryColumns[objectType][0];
   const direction = sortDirection === "ascending" ? 1 : -1;
   const rows = [...matchingRows].sort((left, right) => {
@@ -307,6 +367,9 @@ export function InventoryPage() {
                 setSortColumn(inventoryColumns[nextType][0].key);
                 setSortDirection("ascending");
                 setQuery("");
+                setTypeFilters([]);
+                setAssignmentFilters([]);
+                setOpenFilter(null);
               }}
             >
               {objectTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
@@ -343,7 +406,9 @@ export function InventoryPage() {
           <div className="overflow-x-auto">
             <table className={`w-full ${objectType === "vector" ? "min-w-[950px]" : objectType === "ric_code" ? "min-w-[760px]" : "min-w-[600px]"} table-fixed border-collapse text-left text-sm`}>
               <colgroup>
-                {objectType === "vector" ? <>
+                {objectType === "pager" ? <>
+                  <col className="w-[34%]" /><col className="w-[22%]" /><col className="w-[44%]" />
+                </> : objectType === "vector" ? <>
                   <col className="w-[16%]" /><col className="w-[12%]" /><col className="w-[14%]" /><col className="w-[20%]" /><col className="w-[38%]" />
                 </> : objectType === "ric_code" ? <>
                   <col className="w-[30%]" /><col className="w-[35%]" /><col className="w-[35%]" />
@@ -351,15 +416,28 @@ export function InventoryPage() {
                   <col className="w-1/2" /><col className="w-1/2" />
                 </>}
               </colgroup>
-              <thead className="border-b bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
+              <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
                 <tr>
                   {inventoryColumns[objectType].map((column) => {
                     const active = activeSortColumn.key === column.key;
                     const Icon = !active ? ArrowDownUp : sortDirection === "ascending" ? ArrowUp : ArrowDown;
+                    const filterable = objectType === "pager" && (column.key === "pager_type" || column.key === "assigned_to");
+                    const filterColumn = column.key as "pager_type" | "assigned_to";
+                    const selectedFilters = filterColumn === "pager_type" ? typeFilters : assignmentFilters;
+                    const filterOpen = openFilter?.column === filterColumn;
                     return <th key={column.key} scope="col" aria-sort={active ? sortDirection : undefined} className="px-4 py-3 align-middle">
-                      <button type="button" className="inline-flex items-center gap-2 whitespace-nowrap font-semibold leading-6" aria-label={`Sorteer op ${column.label}`} onClick={() => toggleSort(column.key)}>
-                        {column.label}<Icon aria-hidden="true" className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <button type="button" className="inline-flex min-w-0 items-center gap-2 whitespace-nowrap font-medium leading-6" aria-label={`Sorteer op ${column.label}`} onClick={() => toggleSort(column.key)}>
+                          {column.label}<Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                        </button>
+                        {filterable && <button type="button" className={`relative inline-flex h-6 w-6 shrink-0 items-center justify-center border ${selectedFilters.length ? "text-primary" : "text-muted-foreground"}`} aria-label={`${filterOpen ? "Sluit" : "Open"} filter voor ${column.label}${selectedFilters.length ? `, ${selectedFilters.length} geselecteerd` : ""}`} aria-expanded={filterOpen} onClick={(event) => {
+                          const anchor = event.currentTarget;
+                          setOpenFilter((current) => current?.column === filterColumn ? null : { column: filterColumn, anchor });
+                        }}>
+                          <Filter aria-hidden="true" className="h-3.5 w-3.5" />
+                          {selectedFilters.length > 0 && <span aria-hidden="true" className="absolute -right-3 -top-2 grid h-4 min-w-4 place-items-center !rounded-full bg-primary px-1 text-[9px] leading-none text-primary-foreground">{selectedFilters.length}</span>}
+                        </button>}
+                      </div>
                     </th>;
                   })}
                 </tr>
@@ -375,6 +453,16 @@ export function InventoryPage() {
           </p>
         )}
       </section>
+
+      {openFilter && <FilterPopover
+        key={openFilter.column}
+        anchor={openFilter.anchor}
+        label={openFilter.column === "pager_type" ? "Type" : "Toegewezen aan"}
+        options={openFilter.column === "pager_type" ? pagerTypeOptions : assignmentOptions}
+        selected={openFilter.column === "pager_type" ? typeFilters : assignmentFilters}
+        onChange={openFilter.column === "pager_type" ? setTypeFilters : setAssignmentFilters}
+        onClose={() => setOpenFilter(null)}
+      />}
 
       {selection && (
         <InventoryRelationshipDialog

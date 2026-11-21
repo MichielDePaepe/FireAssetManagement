@@ -163,7 +163,7 @@ describe("LocationsPage", () => {
 
     const tree = await screen.findByRole("tree", { name: "Locatiehiërarchie" });
     await user.click(within(tree).getByRole("button", { name: "Post Noord" }));
-    await user.click(await screen.findByRole("button", { name: "Locatie bewerken Post Noord" }));
+    await user.click(await screen.findByRole("button", { name: "Locatie bewerken: Post Noord" }));
     expect(screen.getByText("Geavanceerde opties").closest("details")).not.toHaveAttribute("open");
     await user.click(screen.getByText("Geavanceerde opties"));
     expect(screen.getByLabelText("Sorteernaam")).toHaveValue("Hoofdpost");
@@ -188,10 +188,10 @@ describe("LocationsPage", () => {
     render(<LocationsPage />);
 
     const tree = await screen.findByRole("tree", { name: "Locatiehiërarchie" });
-    expect(screen.queryByRole("button", { name: "Verwijder locatie Post Noord" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Verwijder locatie Gebouw A" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Locatie verwijderen: Post Noord" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Locatie verwijderen: Gebouw A" })).not.toBeInTheDocument();
     await user.click(within(tree).getByRole("button", { name: "Lokaal 1" }));
-    await user.click(screen.getByRole("button", { name: "Verwijder locatie Lokaal 1" }));
+    await user.click(screen.getByRole("button", { name: "Locatie verwijderen: Lokaal 1" }));
 
     expect(locationApi.deleteLocation).toHaveBeenCalledWith(3);
   });

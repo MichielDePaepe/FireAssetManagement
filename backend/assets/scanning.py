@@ -82,6 +82,30 @@ SCANNER_KEYBOARD_TRANSLATIONS = (
             "(": "9",
         }
     ),
+    # Some QWERTY keyboard-wedge scanners on AZERTY hosts produce letters
+    # with the AZERTY mapping and shifted number-row symbols in one scan.
+    str.maketrans(
+        {
+            "q": "a",
+            "Q": "A",
+            ".": ":",
+            ">": "/",
+            "<": ".",
+            "M": "?",
+            "/": "=",
+            "!": "1",
+            "@": "2",
+            "#": "3",
+            "$": "4",
+            "%": "5",
+            "^": "6",
+            "&": "7",
+            "*": "8",
+            "(": "9",
+            ")": "0",
+            "m": ",",
+        }
+    ),
 )
 FIREPLAN_QR_PATTERN = re.compile(
     r"https?://infoscan\.firebru\.brussels/?\?data[=-]\d+,\d+,\d+,\d+",
