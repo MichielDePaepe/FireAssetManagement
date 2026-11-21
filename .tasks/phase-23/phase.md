@@ -1,9 +1,9 @@
 ---
 phase: 23
 title: Verificatie en documentatie
-status: pending
-opened: ~
-closed: ~
+status: closed
+opened: 2026-11-21
+closed: 2026-11-21
 ---
 ## Goal
 Verifieer de inventaris-API, idempotente opslag, historische koppeling, taakfouten en beheerdersflow; werk product- en architectuurdocumentatie bij.
@@ -21,3 +21,14 @@ Verifieer de inventaris-API, idempotente opslag, historische koppeling, taakfout
 - `SPEC.md`, `ARCHITECTURE.md`, `README.md` en waar nodig `.env.example` beschrijven het geïmplementeerde gedrag en de beperkingen.
 
 ## Tasks
+- [x] task-01-verify-fireplan-inventory-flows.md
+- [x] task-02-document-fireplan-inventory-module.md
+
+## Carry-forward
+
+### Carry from phase 23
+- None.
+
+### Open follow-ups from phase 23
+- The live Redis broker test was skipped in local verification; run it in an environment with the broker available.
+- No live FirePlan synchronization was performed in this phase. The semantics of `updatedAt` for edits to already closed inventories remain unconfirmed; retain manual period reprocessing as the supported refresh path.
