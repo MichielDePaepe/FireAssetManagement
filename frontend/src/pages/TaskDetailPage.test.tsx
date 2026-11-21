@@ -65,4 +65,29 @@ describe("TaskDetailPage Fireplan report", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(openButton).toHaveFocus();
   });
+
+  it("shows the saved inventory sync report with its per-inventory errors", async () => {
+    vi.mocked(api.getTask).mockResolvedValue({
+      task_id: "inventory-sync-42",
+      task_name: "fireplan.sync_inventories",
+      status: "SUCCESS",
+      progress: { current: 4, total: 4, percent: 100 },
+      result: {
+        message: "FirePlan-inventarissynchronisatie voltooid.",
+        added: 2,
+        updated: 1,
+        skipped: 3,
+        failed: 1,
+        errors: [{ uuid: "inventory-bad", error: "Detailophaling mislukt." }],
+      },
+      error: null,
+      updated_at: "2026-11-21T10:00:00Z",
+    });
+    renderDetail("/tasks/inventory-sync-42");
+
+    expect(await screen.findByText("FirePlan-inventarissynchronisatie voltooid.")).toBeInTheDocument();
+    expect(screen.getByText("Overgeslagen")).toBeInTheDocument();
+    expect(screen.getByRole("listitem")).toHaveTextContent("Detailophaling mislukt.");
+    expect(screen.getByRole("heading", { name: "FirePlan-inventarissynchronisatie" })).toBeInTheDocument();
+  });
 });

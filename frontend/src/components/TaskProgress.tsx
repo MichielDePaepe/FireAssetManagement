@@ -1,5 +1,5 @@
 import { CheckCircle2, CircleAlert, LoaderCircle } from "lucide-react";
-import type { FireplanSyncResult, TaskSnapshot } from "@/lib/api";
+import type { FireplanInventorySyncResult, FireplanSyncResult, TaskSnapshot } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -14,6 +14,10 @@ const statusTone = (status: string): "muted" | "success" | "warning" | "danger" 
 
 function isFireplanResult(task: TaskSnapshot): task is TaskSnapshot & { result: FireplanSyncResult } {
   return task.task_name === "fireplan.sync_pagers" && Boolean(task.result && "added" in task.result);
+}
+
+function isFireplanInventoryResult(task: TaskSnapshot): task is TaskSnapshot & { result: FireplanInventorySyncResult } {
+  return task.task_name === "fireplan.sync_inventories" && Boolean(task.result && "skipped" in task.result);
 }
 
 export function TaskProgress({
@@ -55,6 +59,22 @@ export function TaskProgress({
               Synchronisatierapport bekijken
             </Button>
           )}
+        </div>
+      )}
+      {isFireplanInventoryResult(task) && (
+        <div className="space-y-4 border bg-muted/20 p-4">
+          <h3 className="font-medium">Inventarissynchronisatierapport</h3>
+          <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <div><dt className="text-muted-foreground">Toegevoegd</dt><dd className="mt-1 font-semibold">{task.result.added}</dd></div>
+            <div><dt className="text-muted-foreground">Bijgewerkt</dt><dd className="mt-1 font-semibold">{task.result.updated}</dd></div>
+            <div><dt className="text-muted-foreground">Overgeslagen</dt><dd className="mt-1 font-semibold">{task.result.skipped}</dd></div>
+            <div><dt className="text-muted-foreground">Mislukt</dt><dd className="mt-1 font-semibold">{task.result.failed}</dd></div>
+          </dl>
+          {task.result.errors.length > 0 && <ul className="space-y-2 text-sm" aria-label="Fouten per inventaris">
+            {task.result.errors.map((item) => <li key={item.uuid} className="border-l-2 border-red-500 bg-red-50 p-3 text-red-800">
+              <span className="font-medium">{item.uuid}</span>: {item.error}
+            </li>)}
+          </ul>}
         </div>
       )}
     </div>

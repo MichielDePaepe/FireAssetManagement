@@ -50,6 +50,8 @@ All API routes are same-origin under `/api`. Vite proxies requests in developmen
 | GET, PUT | `/api/fireplan/credentials/` | Read or save Fireplan login settings; staff only |
 | POST | `/api/fireplan/test-login/` | Reuse or renew Fireplan session; staff only |
 | POST | `/api/fireplan/sync-pagers/` | Queue Fireplan pager synchronization; staff only |
+| GET | `/api/fireplan/inventories/?page={page}&page_size={size}` | Read one paginated Fireplan summary page merged with local sync state; no details are fetched; staff only |
+| POST | `/api/fireplan/sync-inventories/` | Queue forced inventory detail processing for an inclusive start/end date period; staff only |
 | GET, POST | `/api/printers/` | List or create printer configurations; staff only |
 | GET, PUT, PATCH, DELETE | `/api/printers/{id}/` | Retrieve, edit, or delete a printer configuration; staff only |
 | POST | `/api/printers/{id}/check-connection/` | Check TCP reachability with a two-second timeout; staff only |
@@ -91,6 +93,8 @@ The separate `fireplan` Django app stores settings in the singleton `FireplanCre
 The Fireplan inventory mapping in `fireplan/inventory_mapping.yaml` selects the exact French container name `Cabine de conduite` and item type ID `1010`, validating its readable type name. The container UUID is resolved from each inventory tree before item retrieval; the full tree is not stored by the mapping. Naive source timestamps are assigned `Europe/Brussels`, while explicit offsets are preserved. `updatedAt` is present in the source list, but its behavior when a closed inventory's contents change has not been confirmed; automatic synchronization must not assume it is a reliable change detector or fetch all detail trees hourly. PyYAML is used through `safe_load` because Python's standard library has no YAML parser; see `docs/fireplan-inventory-dependencies.md`.
 
 `FireplanInventory` stores each closed inventory's source metadata, original vehicle code, available status flags, selected radio JSON, mapping version, synchronization status, last attempt/success, and last error. Its optional vehicle and vector links are resolved from an exact unique vehicle alphacode and the `VectorVehicleHistory` interval containing the aware inventory `closedAt`; unknown matches remain null. `FireplanRadioObservation` stores each mapped FirePlan item ID and TEI as text, with uniqueness per inventory/item. `fireplan.sync_inventories` scans paginated summaries hourly and fetches details for new, failed, or mapping-version-stale inventories; a manual date period forces detail retrieval for every included inventory. Source detail and observations are replaced together only after a complete successful fetch and validation. The hourly run does not treat `updatedAt` as a reliable content-change signal. Scheduled task results are ignored; manual runs retain the normal task ID, progress, result, and SSE reporting path.
+
+The staff-only Fireplan inventory list endpoint requests one source summary page and merges it with any local `FireplanInventory` status; Fireplan rows without a local record are returned as not synced. It never requests inventory trees or item lists. The period start endpoint validates inclusive ISO calendar dates and queues a forced detail reprocessing task.
 
 ## CityGIS
 

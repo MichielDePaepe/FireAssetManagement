@@ -147,18 +147,32 @@ class FireplanInventoryClient:
                     ) from error
         return closed_date
 
-    def _list_url(self, first: int) -> str:
+    def _list_url(self, first: int, rows: int | None = None) -> str:
         path = "fr/api/inventory/inventories-type/close"
         url = urljoin(f"{self.base_url}/", path)
         query = urlencode(
             {
                 "first": first,
-                "rows": self.page_size,
+                "rows": rows or self.page_size,
                 "sortField": "closedAt",
                 "sortOrder": -1,
             }
         )
         return f"{url}?{query}"
+
+    def fetch_inventory_summary_page(self, *, first: int, rows: int) -> tuple[list[dict], int]:
+        """Fetch and validate exactly one source page without requesting any details."""
+        if first < 0 or rows < 1 or rows > self.page_size:
+            raise ValueError("Fireplan-paginering buiten het toegestane bereik.")
+        page_records, total = self._page(self._request_json(self._list_url(first, rows)))
+        if len(page_records) > rows:
+            raise FireplanInventoryError("Fireplan overschreed de gevraagde paginagrootte.")
+        page_dates = [self._validate_summary(record) for record in page_records]
+        if any(later > earlier for earlier, later in zip(page_dates, page_dates[1:], strict=False)):
+            raise FireplanInventoryError(
+                "Fireplan-inventarissen zijn niet op closedAt aflopend gesorteerd."
+            )
+        return page_records, total
 
     def fetch_inventory_summaries(
         self, *, start_date: date | None = None, end_date: date | None = None

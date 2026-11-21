@@ -88,6 +88,21 @@ def test_inventory_summary_client_paginates_and_validates_source_rows(inventory_
     assert parse_qs(urlsplit(opener.requests[0][0].full_url).query)["sortField"] == ["closedAt"]
 
 
+def test_inventory_summary_page_client_fetches_one_requested_page(inventory_client):
+    client, opener = inventory_client
+    base = "https://fireplan.example.test/fr/api/inventory/inventories-type/close"
+    opener.responses = [response(base, [source_record("inv-page-2", "2026-11-20 11:00:00")], 41)]
+
+    records, total = client.fetch_inventory_summary_page(first=25, rows=25)
+
+    assert [row["uuid"] for row in records] == ["inv-page-2"]
+    assert total == 41
+    query = parse_qs(urlsplit(opener.requests[0][0].full_url).query)
+    assert query["first"] == ["25"]
+    assert query["rows"] == ["25"]
+    assert len(opener.requests) == 1
+
+
 def test_inventory_summary_client_filters_inclusive_local_period_and_stops_before_start(
     inventory_client,
 ):

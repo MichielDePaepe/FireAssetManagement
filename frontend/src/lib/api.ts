@@ -12,7 +12,7 @@ export interface TaskSnapshot {
   task_name: string | null;
   status: TaskStatus;
   progress: TaskProgress | null;
-  result: ExampleTaskResult | FireplanSyncResult | null;
+  result: ExampleTaskResult | FireplanSyncResult | FireplanInventorySyncResult | null;
   error: string | null;
   updated_at: string | null;
 }
@@ -35,6 +35,48 @@ export interface FireplanSyncResult {
   updated: number;
   unchanged: number;
   errors: FireplanSyncError[];
+}
+
+export interface FireplanInventorySyncError {
+  uuid: string;
+  error: string;
+}
+
+export interface FireplanInventorySyncResult {
+  message?: string;
+  added: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  errors: FireplanInventorySyncError[];
+}
+
+export interface FireplanInventorySummary {
+  uuid: string;
+  vehicle_alpha_code: string;
+  inventory_type_name: string;
+  done_in_name: string;
+  done_by_full_name: string;
+  overseen_by_full_name: string;
+  created_at: string | null;
+  closed_at: string;
+  updated_at: string | null;
+  has_incident_reports: boolean | null;
+  is_complete_after_completion: boolean | null;
+  is_complete_before_completion: boolean | null;
+  is_quantity_count_excluded: boolean | null;
+  is_test_standard: boolean | null;
+  remaining_missing_followed_count: number | null;
+  sync_status: "not_synced" | "pending" | "running" | "synced" | "failed";
+  last_successful_sync_at: string | null;
+  last_error: string;
+}
+
+export interface FireplanInventoryPage {
+  count: number;
+  page: number;
+  page_size: number;
+  results: FireplanInventorySummary[];
 }
 
 export interface StartedTask {
@@ -298,6 +340,15 @@ export const api = {
     request<StartedTask>("/tasks/", { method: "POST", body: JSON.stringify({ duration_seconds }) }),
   startFireplanSync: () =>
     request<StartedTask>("/fireplan/sync-pagers/", { method: "POST" }),
+  getFireplanInventories: (page = 1, pageSize = 25) =>
+    request<FireplanInventoryPage>(
+      `/fireplan/inventories/?page=${page}&page_size=${pageSize}`,
+    ),
+  startFireplanInventorySync: (startDate: string, endDate: string) =>
+    request<StartedTask>("/fireplan/sync-inventories/", {
+      method: "POST",
+      body: JSON.stringify({ start_date: startDate, end_date: endDate }),
+    }),
   getTask: (id: string) => request<TaskSnapshot>(`/tasks/${encodeURIComponent(id)}/`),
   taskEventsUrl: (id: string) => `${API_BASE}/tasks/${encodeURIComponent(id)}/events/`,
   listPagers: () => request<Pager[]>("/pagers/"),

@@ -1,9 +1,9 @@
 ---
 phase: 22
 title: Beheerinterface
-status: pending
-opened: ~
-closed: ~
+status: closed
+opened: 2026-11-21
+closed: 2026-11-21
 ---
 ## Goal
 Voeg een beheerpagina toe die FirePlan-inventarissen en hun lokale synchronisatiestatus toont en hersynchronisatie over een datumbereik kan starten.
@@ -22,3 +22,5 @@ Voeg een beheerpagina toe die FirePlan-inventarissen en hun lokale synchronisati
 - De pagina bevat geen volledige inventarisboomviewer of mappingeditor.
 
 ## Tasks
+- [x] task-01-fireplan-inventory-management-api.md
+- [x] task-02-fireplan-inventory-management-page.md

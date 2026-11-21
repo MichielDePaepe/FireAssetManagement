@@ -9,7 +9,7 @@ import { api, subscribeToTask, type FireplanSyncResult, type TaskSnapshot } from
 import { taskLabel } from "@/lib/taskPresentation";
 
 function fireplanResult(task: TaskSnapshot | null): FireplanSyncResult | null {
-  if (task?.task_name !== "fireplan.sync_pagers" || !task.result || !("added" in task.result)) {
+  if (task?.task_name !== "fireplan.sync_pagers" || !task.result || !("unchanged" in task.result)) {
     return null;
   }
   return task.result;

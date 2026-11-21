@@ -1,4 +1,4 @@
-import { Activity, Boxes, Building2, Gauge, LogOut, Menu, Printer, Radio, X } from "lucide-react";
+import { Activity, Boxes, Building2, ClipboardList, Gauge, LogOut, Menu, Printer, Radio, X } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -56,6 +56,9 @@ export function AppLayout() {
         {user?.is_staff && <div className="border-t px-4 py-5">
           <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Beheer</p>
           <nav className="space-y-1">
+            <NavLink to="/fireplan/inventories" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+              <ClipboardList className="h-4 w-4" />FirePlan-inventarissen
+            </NavLink>
             <NavLink to="/fireplan" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
               <Radio className="h-4 w-4" />Fireplan
             </NavLink>
