@@ -19,7 +19,12 @@ from .serializers import StartTaskSerializer
 from .tasks import example_task
 
 logger = logging.getLogger(__name__)
-TRACKED_TASK_NAMES = ("tasks.example_task", "fireplan.sync_pagers", "citygis.refresh")
+TRACKED_TASK_NAMES = (
+    "tasks.example_task",
+    "fireplan.sync_pagers",
+    "fireplan.sync_inventories",
+    "citygis.refresh",
+)
 
 
 @require_GET

@@ -134,7 +134,12 @@ CELERY_BEAT_SCHEDULE = {
     "citygis-refresh-every-minute": {
         "task": "citygis.refresh",
         "schedule": 60.0,
-    }
+    },
+    "fireplan-inventory-sync-hourly": {
+        "task": "fireplan.sync_inventories",
+        "schedule": 3600.0,
+        "options": {"ignore_result": True},
+    },
 }
 
 SESSION_COOKIE_HTTPONLY = True

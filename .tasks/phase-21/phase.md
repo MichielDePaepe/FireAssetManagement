@@ -1,9 +1,9 @@
 ---
 phase: 21
 title: Opslag en Celery-synchronisatie
-status: pending
-opened: ~
-closed: ~
+status: closed
+opened: 2026-11-21
+closed: 2026-11-21
 ---
 ## Goal
 Bewaar inventarissen en hun relevante radioresultaten idempotent en synchroniseer ze via de bestaande Celery-infrastructuur.
@@ -23,3 +23,10 @@ Bewaar inventarissen en hun relevante radioresultaten idempotent en synchronisee
 - Voortgang, taak-ID en resultaat gebruiken Celery, `celery-progress`, `django-celery-results` en de bestaande SSE-flow.
 
 ## Tasks
+- [x] task-01-inventory-storage-and-history-links.md
+- [x] task-02-inventory-fetch-and-idempotent-processing.md
+- [x] task-03-celery-inventory-synchronization.md
+
+## Execution Notes
+- Backend suite: 188 passed, 1 skipped (requires live Redis broker); Ruff, Django system check, and migration drift check passed.
+- Automatic sync fetches summaries hourly and only fetches details for new, failed, or mapping-version-stale inventories. Manual date periods force detail retrieval.
