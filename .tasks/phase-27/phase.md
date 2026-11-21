@@ -1,9 +1,9 @@
 ---
 phase: 27
 title: FirePlan-synchronisatie en radio-identificatie
-status: open
+status: closed
 opened: 2026-11-21
-closed: ~
+closed: 2026-11-21
 ---
 ## Goal
 Hergebruik de FirePlan QR-inventarisroute en bestaande task/SSE-infrastructuur voor radiosynchronisatie, en hergebruik de scannerbediening voor radiozoekopdrachten.
@@ -24,3 +24,16 @@ Hergebruik de FirePlan QR-inventarisroute en bestaande task/SSE-infrastructuur v
 - De FirePlan-integratie schrijft geen gegevens naar FirePlan en maakt daar geen nieuwe radio's aan.
 
 ## Tasks
+- [x] task-01-confirm-fireplan-radio-contract.md
+- [x] task-02-idempotent-radio-sync-task.md
+- [x] task-03-authenticated-radio-scanlookup.md
+
+## Carry-forward
+
+### Carry from phase 27
+1. Integrate `RadioScanLookup` into the phase 28 Radio module; the component and authenticated endpoint are implemented and tested, but no page consumes it yet.
+2. Keep the live-confirmed FirePlan source names restricted to `Radio mobile Astrid` and `Radio portable Astrid`; do not infer support for unobserved QR types.
+
+### Open follow-ups from phase 27
+- A repeated live FirePlan fetch returned identical IDs and payload immediately, but long-term ID stability was not independently established.
+- The live Redis/Celery integration test remains opt-in and was skipped in focused tests; run it during final verification if available.

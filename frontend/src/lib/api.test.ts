@@ -67,4 +67,46 @@ describe("Fireplan sync API", () => {
       credentials: "include",
     }));
   });
+
+  it("queues a radio sync through the staff endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: async () => ({ task_id: "fireplan-radio-task-42", status: "PENDING" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api.startFireplanRadioSync()).resolves.toEqual({
+      task_id: "fireplan-radio-task-42",
+      status: "PENDING",
+    });
+    expect(fetchMock).toHaveBeenCalledWith("/api/fireplan/sync-radios/", expect.objectContaining({
+      method: "POST",
+      credentials: "include",
+    }));
+  });
+
+  it("looks up a radio QR scan through the authenticated endpoint", async () => {
+    const result = {
+      raw_scan: "https://infoscan.firebru.brussels?data=1,1,4321,1010",
+      radio: {
+        id: 7,
+        tei: "00000000000001",
+        manufacturer: "",
+        model_name: "",
+        application: "portable",
+        model: null,
+        fireplan_id: 4321,
+      },
+    };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => result });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api.lookupRadioScan(result.raw_scan)).resolves.toEqual(result);
+    expect(fetchMock).toHaveBeenCalledWith("/api/radios/scanlookup/", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ scanned_line: result.raw_scan }),
+      credentials: "include",
+    }));
+  });
 });

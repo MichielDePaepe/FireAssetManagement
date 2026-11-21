@@ -14,9 +14,15 @@ class RadioApplication(models.TextChoices):
 
 
 tei_validator = RegexValidator(
-    regex=r"^[0-9A-Fa-f]{15}$",
-    message="Een TEI bevat exact 15 hexadecimale tekens.",
+    regex=r"^(?:[0-9A-Fa-f]{14}|[0-9A-Fa-f]{15})$",
+    message="Een TEI bevat 14 of 15 hexadecimale tekens.",
 )
+
+
+def _is_valid_tei(value: str) -> bool:
+    return len(value) in {14, 15} and all(
+        character in "0123456789abcdefABCDEF" for character in value
+    )
 
 
 class RadioModel(models.Model):
@@ -38,12 +44,18 @@ class RadioModel(models.Model):
         return f"{self.manufacturer} {self.name}"
 
     @classmethod
-    def for_tei(cls, tei: str):
-        tei = tei.upper()
-        return cls.objects.filter(
-            tei_ranges__start_tei__lte=tei,
-            tei_ranges__end_tei__gte=tei,
-        ).first()
+    def for_tei(cls, tei: str, application: str | None = None):
+        try:
+            numeric_tei = int(tei, 16)
+        except (TypeError, ValueError):
+            return None
+        ranges = TeiRange.objects.select_related("model")
+        if application is not None:
+            ranges = ranges.filter(model__application=application)
+        for tei_range in ranges:
+            if int(tei_range.start_tei, 16) <= numeric_tei <= int(tei_range.end_tei, 16):
+                return tei_range.model
+        return None
 
 
 class TeiRange(models.Model):
@@ -59,13 +71,20 @@ class TeiRange(models.Model):
         start = (self.start_tei or "").upper()
         end = (self.end_tei or "").upper()
         errors = {}
-        if start and end and start > end:
+        valid_start = _is_valid_tei(start)
+        valid_end = _is_valid_tei(end)
+        if valid_start and valid_end and int(start, 16) > int(end, 16):
             errors["end_tei"] = "Het eind van het TEI-bereik moet na het begin liggen."
-        if start and end and self.model_id:
-            overlapping = TeiRange.objects.filter(start_tei__lte=end, end_tei__gte=start)
+        if valid_start and valid_end and self.model_id:
+            start_value = int(start, 16)
+            end_value = int(end, 16)
+            existing_ranges = TeiRange.objects.all()
             if self.pk:
-                overlapping = overlapping.exclude(pk=self.pk)
-            if overlapping.exists():
+                existing_ranges = existing_ranges.exclude(pk=self.pk)
+            if any(
+                int(row.start_tei, 16) <= end_value and int(row.end_tei, 16) >= start_value
+                for row in existing_ranges
+            ):
                 errors["start_tei"] = "Dit TEI-bereik overlapt een bestaand bereik."
         if errors:
             raise ValidationError(errors)
@@ -110,7 +129,7 @@ class Radio(models.Model):
 
     def save(self, *args, **kwargs):
         if self.model_id is None:
-            self.model = RadioModel.for_tei(self.tei)
+            self.model = RadioModel.for_tei(self.tei, self.application)
         if self.managed_object_id:
             return super().save(*args, **kwargs)
         with transaction.atomic():

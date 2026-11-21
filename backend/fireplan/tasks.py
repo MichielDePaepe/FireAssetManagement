@@ -13,6 +13,7 @@ from .crypto import decrypt_secret, encrypt_secret
 from .inventory_client import FireplanInventoryClient
 from .inventory_synchronization import synchronize_fireplan_inventories
 from .models import FireplanCredential
+from .radio_synchronization import RADIO_APPLICATIONS, synchronize_fireplan_radios
 from .synchronization import synchronize_fireplan_pagers
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,61 @@ def synchronize_pagers(self) -> dict[str, object]:
             "added": summary["added"],
             "updated": summary["updated"],
             "unchanged": summary["unchanged"],
+            "error_count": len(summary["errors"]),
+        },
+    )
+    return result
+
+
+@shared_task(
+    bind=True,
+    name="fireplan.sync_radios",
+    autoretry_for=(RuntimeError,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=settings.CELERY_TASK_MAX_RETRIES,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    soft_time_limit=settings.CELERY_TASK_SOFT_TIME_LIMIT,
+    time_limit=settings.CELERY_TASK_TIME_LIMIT,
+)
+def synchronize_radios(self) -> dict[str, object]:
+    """Fetch confirmed FirePlan radio QR records and update the local radio assets."""
+    progress = ProgressRecorder(self)
+    progress.set_progress(0, 1, description="FirePlan-radio's ophalen")
+
+    credential = FireplanCredential.objects.filter(pk=1).first()
+    if not credential or not credential.encrypted_password:
+        raise FireplanLoginError("Stel eerst FirePlan-inloggegevens in.")
+    password = decrypt_secret(credential.encrypted_password)
+    cookie_data = (
+        decrypt_secret(credential.encrypted_cookies) if credential.encrypted_cookies else None
+    )
+    records, refreshed_cookie_data = fetch_inventory_qr_codes(
+        credential.login,
+        password,
+        cookie_data,
+        list(RADIO_APPLICATIONS),
+    )
+    credential.encrypted_cookies = encrypt_secret(refreshed_cookie_data)
+    credential.session_checked_at = timezone.now()
+    credential.save(update_fields=["encrypted_cookies", "session_checked_at", "updated_at"])
+    summary = synchronize_fireplan_radios(
+        records,
+        progress_callback=lambda current, total, description: progress.set_progress(
+            current, total, description=description
+        ),
+    )
+    progress.set_progress(1, 1, description="FirePlan-radiosynchronisatie voltooid")
+    result = {"message": "FirePlan-radiosynchronisatie voltooid.", **summary}
+    logger.info(
+        "FirePlan radio synchronization finished",
+        extra={
+            "task_id": self.request.id,
+            "added": summary["added"],
+            "updated": summary["updated"],
+            "unchanged": summary["unchanged"],
+            "skipped": summary["skipped"],
             "error_count": len(summary["errors"]),
         },
     )

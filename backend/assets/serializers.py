@@ -2,13 +2,42 @@ from rest_framework import serializers
 
 from inventory.serializers import ManagedObjectIdentitySerializer
 
-from .models import Pager, PagerType, RicCode
+from .models import Pager, PagerType, Radio, RadioModel, RicCode
 
 
 class PagerTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = PagerType
         fields = ["id", "name"]
+
+
+class RadioModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RadioModel
+        fields = ["id", "manufacturer", "name", "application"]
+        read_only_fields = fields
+
+
+class RadioSerializer(serializers.ModelSerializer):
+    managed_object = ManagedObjectIdentitySerializer(read_only=True)
+    model = RadioModelSerializer(read_only=True)
+
+    class Meta:
+        model = Radio
+        fields = [
+            "id",
+            "managed_object",
+            "tei",
+            "manufacturer",
+            "model_name",
+            "application",
+            "model",
+            "fireplan_id",
+            "fireplan_qr_url",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
 
 
 class PagerSerializer(serializers.ModelSerializer):

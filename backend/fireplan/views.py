@@ -17,7 +17,7 @@ from .inventory_client import FireplanInventoryClient
 from .inventory_mapping import parse_fireplan_datetime
 from .inventory_relationships import resolve_inventory_relationship
 from .models import FireplanCredential, FireplanInventory
-from .tasks import synchronize_inventories, synchronize_pagers
+from .tasks import synchronize_inventories, synchronize_pagers, synchronize_radios
 
 
 class FireplanCredentialSerializer(serializers.Serializer):
@@ -159,6 +159,46 @@ class FireplanPagerSyncView(APIView):
             )
 
         task = synchronize_pagers.apply_async()
+        return Response(
+            {"task_id": task.id, "status": "PENDING"},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class FireplanRadioSyncView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        request=None,
+        responses={
+            202: inline_serializer(
+                name="FireplanRadioSyncAccepted",
+                fields={
+                    "task_id": serializers.CharField(),
+                    "status": serializers.ChoiceField(choices=["PENDING"]),
+                },
+            )
+        },
+    )
+    def post(self, request):
+        credential = FireplanCredential.objects.filter(pk=1).first()
+        if not credential or not credential.encrypted_password:
+            return Response(
+                {"detail": "Stel eerst FirePlan-inloggegevens in."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            decrypt_secret(credential.encrypted_password)
+            if credential.encrypted_cookies:
+                cookie_data = decrypt_secret(credential.encrypted_cookies)
+                deserialize_cookie_jar(cookie_data)
+        except (FireplanEncryptionError, FireplanLoginError) as error:
+            return Response(
+                {"detail": f"FirePlan-inloggegevens zijn onbruikbaar: {error}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        task = synchronize_radios.apply_async()
         return Response(
             {"task_id": task.id, "status": "PENDING"},
             status=status.HTTP_202_ACCEPTED,

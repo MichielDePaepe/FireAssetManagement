@@ -3,6 +3,7 @@ import type { TaskStatus } from "@/lib/api";
 const taskLabels: Record<string, string> = {
   "tasks.example_task": "Celery-voortgangstest",
   "fireplan.sync_pagers": "Fireplan-pagersynchronisatie",
+  "fireplan.sync_radios": "FirePlan-radiosynchronisatie",
   "fireplan.sync_inventories": "FirePlan-inventarissynchronisatie",
   "citygis.refresh": "CityGIS-synchronisatie",
 };

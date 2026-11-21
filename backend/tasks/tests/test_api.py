@@ -114,6 +114,23 @@ def test_task_detail_exposes_fireplan_inventory_sync_result(client):
     assert response.json()["result"]["skipped"] == 3
 
 
+def test_task_detail_exposes_fireplan_radio_sync_result(client):
+    snapshot = {
+        "task_id": "fireplan-radio-task-123",
+        "task_name": "fireplan.sync_radios",
+        "status": "SUCCESS",
+        "progress": None,
+        "result": {"added": 2, "updated": 1, "unchanged": 4, "skipped": 0, "errors": []},
+        "error": None,
+        "updated_at": None,
+    }
+    with patch("tasks.views.task_snapshot", return_value=snapshot):
+        response = client.get(reverse("task-detail", args=["fireplan-radio-task-123"]))
+
+    assert response.status_code == 200
+    assert response.json()["result"]["added"] == 2
+
+
 def test_progress_recorder_payload_is_exposed_without_an_extra_model():
     class ActiveResult:
         state = "PROGRESS"

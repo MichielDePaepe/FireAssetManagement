@@ -251,6 +251,16 @@ export interface Pager {
   updated_at: string;
 }
 
+export interface RadioAsset {
+  id: number;
+  tei: string;
+  manufacturer: string;
+  model_name: string;
+  application: "portable" | "vehicle" | "fixed";
+  model: { id: number; manufacturer: string; name: string; application: string } | null;
+  fireplan_id: number | null;
+}
+
 export interface RicCode {
   id: number;
   ric_code: string;
@@ -372,6 +382,13 @@ export const api = {
     request<StartedTask>("/tasks/", { method: "POST", body: JSON.stringify({ duration_seconds }) }),
   startFireplanSync: () =>
     request<StartedTask>("/fireplan/sync-pagers/", { method: "POST" }),
+  startFireplanRadioSync: () =>
+    request<StartedTask>("/fireplan/sync-radios/", { method: "POST" }),
+  lookupRadioScan: (scanned_line: string) =>
+    request<{ raw_scan: string; radio: RadioAsset }>("/radios/scanlookup/", {
+      method: "POST",
+      body: JSON.stringify({ scanned_line }),
+    }),
   getFireplanInventories: (page = 1, pageSize = 25) =>
     request<FireplanInventoryPage>(
       `/fireplan/inventories/?page=${page}&page_size=${pageSize}`,

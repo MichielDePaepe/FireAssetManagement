@@ -1,12 +1,20 @@
 ---
 phase: 28
 title: Radio-, ISSI- en abonnementenbeheer
-status: pending
-opened: ~
+status: open
+opened: 2026-11-21
 closed: ~
 ---
 ## Goal
 Bied een toegankelijke interface en API voor radio's, ISSI's, organisaties, modelbereiken, abonnementen en plaatsingen met de bestaande FAM-patronen.
+
+## Carry from phase 27
+1. Integrate `RadioScanLookup` into the phase 28 Radio module; the component and authenticated endpoint are implemented and tested, but no page consumes it yet.
+2. Keep the live-confirmed FirePlan source names restricted to `Radio mobile Astrid` and `Radio portable Astrid`; do not infer support for unobserved QR types.
+
+## Open follow-ups from phase 27
+- A repeated live FirePlan fetch returned identical IDs and payload immediately, but long-term ID stability was not independently established.
+- The live Redis/Celery integration test remains opt-in and was skipped in focused tests; run it during final verification if available.
 
 ## Exit Criteria
 - Een navigatie-item Radio's staat direct onder Pagers en opent een module met Radio's-, ISSI's- en Abonnementenweergaven.
