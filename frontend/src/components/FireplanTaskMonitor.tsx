@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api, subscribeToTask, type FireplanSyncResult, type TaskSnapshot } from "@/lib/api";
 
 function fireplanReport(task: TaskSnapshot): FireplanSyncResult | null {
-  if (task.task_name !== "fireplan.sync_pagers" || !task.result || !("added" in task.result)) {
+  if (task.task_name !== "fireplan.sync_pagers" || !task.result || !("unchanged" in task.result)) {
     return null;
   }
   return task.result;

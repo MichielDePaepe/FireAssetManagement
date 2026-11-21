@@ -1,0 +1,4 @@
+version: 1
+container_name_fr: Cabine de conduite
+item_type_id: 1010
+item_type_name: Radio portable Astrid
