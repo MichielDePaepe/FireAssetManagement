@@ -182,6 +182,18 @@ class ManagedRelationship(models.Model):
             relation.save()
             return relation
 
+    @classmethod
+    def clear(cls, source: ManagedObject, kind: str):
+        with transaction.atomic():
+            locked_source = ManagedObject.objects.select_for_update().get(pk=source.pk)
+            current = cls.objects.filter(
+                source=locked_source, kind=kind, ended_at__isnull=True
+            ).first()
+            if current:
+                current.ended_at = timezone.now()
+                current.save(update_fields=["ended_at"])
+            return current
+
     def __str__(self) -> str:
         destination = self.target or self.target_location
         return f"{self.source} {self.get_kind_display()} {destination}"

@@ -1,13 +1,12 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { api, subscribeToTask, type FireplanSyncResult, type TaskSnapshot } from "@/lib/api";
+import { api, subscribeToTask, type FireplanRadioSyncResult, type FireplanSyncResult, type TaskSnapshot } from "@/lib/api";
 
-function fireplanReport(task: TaskSnapshot): FireplanSyncResult | null {
-  if (task.task_name !== "fireplan.sync_pagers" || !task.result || !("unchanged" in task.result)) {
-    return null;
-  }
-  return task.result;
+function fireplanReport(task: TaskSnapshot): FireplanSyncResult | FireplanRadioSyncResult | null {
+  if (!task.result || !("unchanged" in task.result)) return null;
+  if (task.task_name === "fireplan.sync_pagers" || task.task_name === "fireplan.sync_radios") return task.result;
+  return null;
 }
 
 export function FireplanTaskMonitor() {
@@ -42,7 +41,7 @@ export function FireplanTaskMonitor() {
         };
         if (task.status === "SUCCESS" && report) {
           toast.success("Fireplan-synchronisatie voltooid", {
-            description: `${report.added} toegevoegd · ${report.updated} bijgewerkt · ${report.unchanged} ongewijzigd · ${report.errors.length} fouten`,
+            description: `${report.added} toegevoegd · ${report.updated} bijgewerkt · ${report.unchanged} ongewijzigd · ${report.errors.length} fouten${"skipped" in report ? ` · ${report.skipped} overgeslagen` : ""}`,
             action,
           });
         } else {

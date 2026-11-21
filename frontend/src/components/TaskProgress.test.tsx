@@ -49,4 +49,19 @@ describe("TaskProgress", () => {
     await user.click(screen.getByRole("button", { name: "Synchronisatierapport bekijken" }));
     expect(onOpenReport).toHaveBeenCalledOnce();
   });
+
+  it("shows radio sync counts and report errors", async () => {
+    const onOpenReport = vi.fn();
+    const user = userEvent.setup();
+    render(<TaskProgress task={{
+      ...task,
+      task_name: "fireplan.sync_radios",
+      status: "SUCCESS",
+      result: { message: "done", added: 1, updated: 2, unchanged: 3, skipped: 4, errors: [{ fireplan_id: 44, name: "Radio portable Astrid", message: "Ongeldige TEI" }] },
+    }} onOpenReport={onOpenReport} />);
+    expect(screen.getByText("Overgeslagen").parentElement).toHaveTextContent("4");
+    expect(screen.getByRole("list", { name: "Radio's met synchronisatiefouten" })).toHaveTextContent("Radio portable Astrid · FirePlan-ID 44: Ongeldige TEI");
+    await user.click(screen.getByRole("button", { name: "Synchronisatierapport bekijken" }));
+    expect(onOpenReport).toHaveBeenCalledOnce();
+  });
 });

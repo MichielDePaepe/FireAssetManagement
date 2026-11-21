@@ -1,9 +1,9 @@
 ---
 phase: 28
 title: Radio-, ISSI- en abonnementenbeheer
-status: open
+status: closed
 opened: 2026-11-21
-closed: ~
+closed: 2026-11-21
 ---
 ## Goal
 Bied een toegankelijke interface en API voor radio's, ISSI's, organisaties, modelbereiken, abonnementen en plaatsingen met de bestaande FAM-patronen.
@@ -27,3 +27,7 @@ Bied een toegankelijke interface en API voor radio's, ISSI's, organisaties, mode
 - Tabellen volgen de bestaande vaste tabelgeometrie, sorteer- en filterpatronen, en bedieningselementen hebben toegankelijke labels/states en toetsenbordondersteuning.
 
 ## Tasks
+- [x] task-01-radio-reference-and-management-api.md
+- [x] task-02-radio-placement-api.md
+- [x] task-03-radio-module-ui-and-history.md
+- [x] task-04-radio-scan-sync-and-placement-ui.md

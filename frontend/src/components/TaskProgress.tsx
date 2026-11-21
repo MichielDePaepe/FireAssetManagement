@@ -1,5 +1,5 @@
 import { CheckCircle2, CircleAlert, LoaderCircle } from "lucide-react";
-import type { FireplanInventorySyncResult, FireplanSyncResult, TaskSnapshot } from "@/lib/api";
+import type { FireplanInventorySyncResult, FireplanRadioSyncResult, FireplanSyncResult, TaskSnapshot } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -18,6 +18,10 @@ function isFireplanResult(task: TaskSnapshot): task is TaskSnapshot & { result: 
 
 function isFireplanInventoryResult(task: TaskSnapshot): task is TaskSnapshot & { result: FireplanInventorySyncResult } {
   return task.task_name === "fireplan.sync_inventories" && Boolean(task.result && "skipped" in task.result);
+}
+
+function isFireplanRadioResult(task: TaskSnapshot): task is TaskSnapshot & { result: FireplanRadioSyncResult } {
+  return task.task_name === "fireplan.sync_radios" && Boolean(task.result && "skipped" in task.result);
 }
 
 export function TaskProgress({
@@ -59,6 +63,24 @@ export function TaskProgress({
               Synchronisatierapport bekijken
             </Button>
           )}
+        </div>
+      )}
+      {isFireplanRadioResult(task) && (
+        <div className="space-y-4 border bg-muted/20 p-4">
+          <h3 className="font-medium">Radiosynchronisatierapport</h3>
+          <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+            <div><dt className="text-muted-foreground">Toegevoegd</dt><dd className="mt-1 font-semibold">{task.result.added}</dd></div>
+            <div><dt className="text-muted-foreground">Bijgewerkt</dt><dd className="mt-1 font-semibold">{task.result.updated}</dd></div>
+            <div><dt className="text-muted-foreground">Ongewijzigd</dt><dd className="mt-1 font-semibold">{task.result.unchanged}</dd></div>
+            <div><dt className="text-muted-foreground">Overgeslagen</dt><dd className="mt-1 font-semibold">{task.result.skipped}</dd></div>
+            <div><dt className="text-muted-foreground">Fouten</dt><dd className="mt-1 font-semibold">{task.result.errors.length}</dd></div>
+          </dl>
+          {task.result.errors.length > 0 && <ul className="space-y-2 text-sm" aria-label="Radio's met synchronisatiefouten">
+            {task.result.errors.map((item, index) => <li key={`${item.fireplan_id ?? "unknown"}-${index}`} className="border-l-2 border-red-500 bg-red-50 p-3 text-red-800">
+              <span className="font-medium">{item.name ?? "Onbekend radiotype"}</span>{item.fireplan_id ? ` · FirePlan-ID ${item.fireplan_id}` : ""}: {item.message}
+            </li>)}
+          </ul>}
+          {onOpenReport && <Button variant="outline" onClick={onOpenReport}>Synchronisatierapport bekijken</Button>}
         </div>
       )}
       {isFireplanInventoryResult(task) && (

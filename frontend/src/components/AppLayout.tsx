@@ -41,6 +41,7 @@ export function AppLayout() {
   const links = [
     { to: "/", label: "Dashboard", icon: Gauge, end: true },
     { to: "/pagers", label: "Pagers", icon: Radio, end: false },
+    { to: "/radios", label: "Radio's", icon: Radio, end: false },
   ];
 
   return (

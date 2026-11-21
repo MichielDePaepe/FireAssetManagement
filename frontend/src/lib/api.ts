@@ -12,7 +12,7 @@ export interface TaskSnapshot {
   task_name: string | null;
   status: TaskStatus;
   progress: TaskProgress | null;
-  result: ExampleTaskResult | FireplanSyncResult | FireplanInventorySyncResult | null;
+  result: ExampleTaskResult | FireplanSyncResult | FireplanRadioSyncResult | FireplanInventorySyncResult | null;
   error: string | null;
   updated_at: string | null;
 }
@@ -27,6 +27,21 @@ export interface FireplanSyncError {
   serial_number: string | null;
   name: string | null;
   message: string;
+}
+
+export interface FireplanRadioSyncError {
+  fireplan_id: number | null;
+  name: string | null;
+  message: string;
+}
+
+export interface FireplanRadioSyncResult {
+  message?: string;
+  added: number;
+  updated: number;
+  unchanged: number;
+  skipped: number;
+  errors: FireplanRadioSyncError[];
 }
 
 export interface FireplanSyncResult {
@@ -258,7 +273,62 @@ export interface RadioAsset {
   model_name: string;
   application: "portable" | "vehicle" | "fixed";
   model: { id: number; manufacturer: string; name: string; application: string } | null;
+  model_id?: number | null;
   fireplan_id: number | null;
+  fireplan_qr_url?: string | null;
+  current_subscription?: RadioSubscription | null;
+  subscription_history?: RadioSubscription[];
+}
+
+export interface Organization {
+  id: number;
+  name: string;
+}
+
+export interface IssiAsset {
+  id: number;
+  issi: string;
+  alias: string;
+  organization: Organization | null;
+  organization_id?: number | null;
+  current_subscription?: RadioSubscription | null;
+  subscription_history?: RadioSubscription[];
+}
+
+export interface RadioModel {
+  id: number;
+  manufacturer: string;
+  name: string;
+  application: RadioAsset["application"];
+}
+
+export interface TeiRange {
+  id: number;
+  model: RadioModel;
+  start_tei: string;
+  end_tei: string;
+}
+
+export interface RadioSubscription {
+  id: number;
+  radio: { id: number; tei: string };
+  issi: { id: number; issi: string; alias: string };
+  started_at: string;
+  ended_at: string | null;
+}
+
+export interface RadioRelationshipEntry {
+  id: number;
+  kind: "assigned_to" | "mounted_in" | "installed_in";
+  target: ManagedObjectIdentity | null;
+  location: Pick<CityGISLocation, "id" | "name" | "kind"> | null;
+  started_at: string;
+  ended_at: string | null;
+}
+
+export interface RadioRelationshipSnapshot {
+  current: RadioRelationshipEntry | null;
+  history: RadioRelationshipEntry[];
 }
 
 export interface RicCode {
@@ -388,6 +458,58 @@ export const api = {
     request<{ raw_scan: string; radio: RadioAsset }>("/radios/scanlookup/", {
       method: "POST",
       body: JSON.stringify({ scanned_line }),
+    }),
+  listRadios: (search = "") =>
+    request<RadioAsset[]>(`/radios/${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+  getRadioRelationship: (id: number) =>
+    request<RadioRelationshipSnapshot>(`/inventory/radios/${id}/relationship/`),
+  updateRadioRelationship: (id: number, values: {
+    kind: RadioRelationshipEntry["kind"];
+    target_object_id: number | null;
+    location_id: number | null;
+  }) => request<RadioRelationshipSnapshot>(`/inventory/radios/${id}/relationship/`, {
+    method: "PUT", body: JSON.stringify(values),
+  }),
+  createRadio: (values: {
+    tei: string;
+    application: RadioAsset["application"];
+    manufacturer: string;
+    model_name: string;
+    model_id?: number | null;
+  }) => request<RadioAsset>("/radios/", { method: "POST", body: JSON.stringify(values) }),
+  updateRadio: (id: number, values: Partial<RadioAsset>) =>
+    request<RadioAsset>(`/radios/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
+  deleteRadio: (id: number) => request<void>(`/radios/${id}/`, { method: "DELETE" }),
+  listIssis: (search = "") =>
+    request<IssiAsset[]>(`/issis/${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+  createIssi: (values: { issi: string; alias: string; organization_id?: number | null }) =>
+    request<IssiAsset>("/issis/", { method: "POST", body: JSON.stringify(values) }),
+  updateIssi: (id: number, values: Partial<IssiAsset>) =>
+    request<IssiAsset>(`/issis/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
+  deleteIssi: (id: number) => request<void>(`/issis/${id}/`, { method: "DELETE" }),
+  listOrganizations: () => request<Organization[]>("/organizations/"),
+  createOrganization: (values: { name: string }) =>
+    request<Organization>("/organizations/", { method: "POST", body: JSON.stringify(values) }),
+  updateOrganization: (id: number, values: { name: string }) =>
+    request<Organization>(`/organizations/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
+  deleteOrganization: (id: number) => request<void>(`/organizations/${id}/`, { method: "DELETE" }),
+  listRadioModels: () => request<RadioModel[]>("/radio-models/"),
+  createRadioModel: (values: Omit<RadioModel, "id">) =>
+    request<RadioModel>("/radio-models/", { method: "POST", body: JSON.stringify(values) }),
+  updateRadioModel: (id: number, values: Omit<RadioModel, "id">) =>
+    request<RadioModel>(`/radio-models/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
+  deleteRadioModel: (id: number) => request<void>(`/radio-models/${id}/`, { method: "DELETE" }),
+  listTeiRanges: () => request<TeiRange[]>("/tei-ranges/"),
+  createTeiRange: (values: { model_id: number; start_tei: string; end_tei: string }) =>
+    request<TeiRange>("/tei-ranges/", { method: "POST", body: JSON.stringify(values) }),
+  updateTeiRange: (id: number, values: { model_id: number; start_tei: string; end_tei: string }) =>
+    request<TeiRange>(`/tei-ranges/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
+  deleteTeiRange: (id: number) => request<void>(`/tei-ranges/${id}/`, { method: "DELETE" }),
+  listRadioSubscriptions: () => request<RadioSubscription[]>("/radio-subscriptions/"),
+  assignRadioSubscription: (radio_id: number, issi_id: number) =>
+    request<RadioSubscription>("/radio-subscriptions/", {
+      method: "POST",
+      body: JSON.stringify({ radio_id, issi_id }),
     }),
   getFireplanInventories: (page = 1, pageSize = 25) =>
     request<FireplanInventoryPage>(

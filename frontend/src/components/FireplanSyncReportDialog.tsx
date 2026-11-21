@@ -1,13 +1,13 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
-import type { FireplanSyncResult } from "@/lib/api";
+import type { FireplanRadioSyncResult, FireplanSyncResult } from "@/lib/api";
 
 export function FireplanSyncReportDialog({
   report,
   open,
   onClose,
 }: {
-  report: FireplanSyncResult;
+  report: FireplanSyncResult | FireplanRadioSyncResult;
   open: boolean;
   onClose: () => void;
 }) {
@@ -65,7 +65,7 @@ export function FireplanSyncReportDialog({
               Fireplan-synchronisatierapport
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Resultaat van de pagerinventarisatie.
+              {"skipped" in report ? "Resultaat van de radiosynchronisatie." : "Resultaat van de pagerinventarisatie."}
             </p>
           </div>
           <button
@@ -84,6 +84,7 @@ export function FireplanSyncReportDialog({
           <div className="border p-4"><dt className="text-sm text-muted-foreground">Bijgewerkt</dt><dd className="mt-1 text-2xl font-semibold">{report.updated}</dd></div>
           <div className="border p-4"><dt className="text-sm text-muted-foreground">Ongewijzigd</dt><dd className="mt-1 text-2xl font-semibold">{report.unchanged}</dd></div>
           <div className="border p-4"><dt className="text-sm text-muted-foreground">Mislukt</dt><dd className="mt-1 text-2xl font-semibold">{report.errors.length}</dd></div>
+          {"skipped" in report && <div className="border p-4"><dt className="text-sm text-muted-foreground">Overgeslagen</dt><dd className="mt-1 text-2xl font-semibold">{report.skipped}</dd></div>}
         </dl>
 
         <section className="mt-6" aria-labelledby="fireplan-report-errors">
@@ -93,12 +94,9 @@ export function FireplanSyncReportDialog({
           ) : (
             <ul className="mt-3 space-y-3">
               {report.errors.map((error, index) => (
-                <li key={`${error.fireplan_id ?? "unknown"}-${error.serial_number ?? index}-${index}`} className="border p-4 text-sm">
+                <li key={`${error.fireplan_id ?? "unknown"}-${index}`} className="border p-4 text-sm">
                   <p className="font-medium">{error.name ?? "Onbekend toesteltype"}</p>
-                  <p className="mt-1 text-muted-foreground">
-                    {error.serial_number ? `Serienummer: ${error.serial_number}` : "Geen serienummer"}
-                    {error.fireplan_id ? ` · Fireplan-ID: ${error.fireplan_id}` : ""}
-                  </p>
+                  <p className="mt-1 text-muted-foreground">{"serial_number" in error ? (error.serial_number ? `Serienummer: ${error.serial_number}` : "Geen serienummer") : "TEI niet beschikbaar"}{error.fireplan_id ? ` · Fireplan-ID: ${error.fireplan_id}` : ""}</p>
                   <p className="mt-2 text-red-800">{error.message}</p>
                 </li>
               ))}

@@ -12,6 +12,7 @@ const LoginPage = lazy(() => import("@/pages/LoginPage").then((module) => ({ def
 const TaskDetailPage = lazy(() => import("@/pages/TaskDetailPage").then((module) => ({ default: module.TaskDetailPage })));
 const TasksPage = lazy(() => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
 const PagersPage = lazy(() => import("@/pages/PagersPage").then((module) => ({ default: module.PagersPage })));
+const RadioManagementPage = lazy(() => import("@/pages/RadioManagementPage").then((module) => ({ default: module.RadioManagementPage })));
 const FireplanSettingsPage = lazy(() => import("@/pages/FireplanSettingsPage").then((module) => ({ default: module.FireplanSettingsPage })));
 const LabelPrintersPage = lazy(() => import("@/pages/LabelPrintersPage").then((module) => ({ default: module.LabelPrintersPage })));
 const CityGISPage = lazy(() => import("@/pages/CityGISPage").then((module) => ({ default: module.CityGISPage })));
@@ -42,6 +43,7 @@ function App() {
       <Route index element={<DashboardPage />} />
       <Route path="tasks" element={<TasksPage />} />
       <Route path="pagers" element={<PagersPage />} />
+      <Route path="radios" element={<RadioManagementPage />} />
       <Route path="tasks/:taskId" element={<TaskDetailPage />} />
       <Route element={<AdminLayout />}>
         <Route path="fireplan" element={<FireplanSettingsPage />} />
