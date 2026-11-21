@@ -154,11 +154,21 @@ class FireplanInventoryClient:
             {
                 "first": first,
                 "rows": rows or self.page_size,
-                "sortField": "closedAt",
-                "sortOrder": -1,
+                "filters": "{}",
+                "multiSortMeta": json.dumps(
+                    [{"field": "closedAt", "order": -1}], separators=(",", ":")
+                ),
             }
         )
         return f"{url}?{query}"
+
+    @staticmethod
+    def _sort_summaries(records: list[dict]) -> list[dict]:
+        return sorted(
+            records,
+            key=lambda record: (parse_fireplan_datetime(record["closedAt"]), record["uuid"]),
+            reverse=True,
+        )
 
     def fetch_inventory_summary_page(self, *, first: int, rows: int) -> tuple[list[dict], int]:
         """Fetch and validate exactly one source page without requesting any details."""
@@ -167,12 +177,9 @@ class FireplanInventoryClient:
         page_records, total = self._page(self._request_json(self._list_url(first, rows)))
         if len(page_records) > rows:
             raise FireplanInventoryError("Fireplan overschreed de gevraagde paginagrootte.")
-        page_dates = [self._validate_summary(record) for record in page_records]
-        if any(later > earlier for earlier, later in zip(page_dates, page_dates[1:], strict=False)):
-            raise FireplanInventoryError(
-                "Fireplan-inventarissen zijn niet op closedAt aflopend gesorteerd."
-            )
-        return page_records, total
+        for record in page_records:
+            self._validate_summary(record)
+        return self._sort_summaries(page_records), total
 
     def fetch_inventory_summaries(
         self, *, start_date: date | None = None, end_date: date | None = None
@@ -183,43 +190,42 @@ class FireplanInventoryClient:
             raise ValueError("Begindatum mag niet na einddatum liggen.")
 
         records: list[dict] = []
+        records_by_uuid: dict[str, dict] = {}
         first = 0
         total: int | None = None
-        stop_before_next_page = False
-        previous_date: date | None = None
 
         while total is None or first < total:
             page_records, page_total = self._page(self._request_json(self._list_url(first)))
             total = page_total
             page_dates = [self._validate_summary(record) for record in page_records]
-            if any(
-                later > earlier for earlier, later in zip(page_dates, page_dates[1:], strict=False)
-            ):
-                raise FireplanInventoryError(
-                    "Fireplan-inventarissen zijn niet op closedAt aflopend gesorteerd."
-                )
-            if previous_date and page_dates and page_dates[0] > previous_date:
-                raise FireplanInventoryError(
-                    "Fireplan-inventarispaginering brak de closedAt-volgorde."
-                )
-            if page_dates:
-                previous_date = page_dates[-1]
 
             for record, closed_date in zip(page_records, page_dates, strict=False):
                 if start_date and closed_date < start_date:
-                    stop_before_next_page = True
-                    break
+                    continue
                 if end_date is None or closed_date <= end_date:
-                    records.append(record)
+                    inventory_uuid = record["uuid"]
+                    existing = records_by_uuid.get(inventory_uuid)
+                    if existing is None:
+                        records_by_uuid[inventory_uuid] = record
+                    else:
+                        existing_updated_at = existing.get("updatedAt")
+                        candidate_updated_at = record.get("updatedAt")
+                        if candidate_updated_at and (
+                            not existing_updated_at
+                            or parse_fireplan_datetime(candidate_updated_at)
+                            > parse_fireplan_datetime(existing_updated_at)
+                        ):
+                            records_by_uuid[inventory_uuid] = record
 
-            if stop_before_next_page or len(records) >= total:
+            if len(records_by_uuid) >= total:
                 break
             if not page_records:
                 raise FireplanInventoryError(
                     "Fireplan gaf geen records terug vóór het gerapporteerde einde."
                 )
             first += len(page_records)
-        return records
+        records.extend(records_by_uuid.values())
+        return self._sort_summaries(records)
 
     def fetch_inventory_radio_items(self, inventory_uuid: str) -> list[dict]:
         escaped_uuid = quote(inventory_uuid, safe="")
