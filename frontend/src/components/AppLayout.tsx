@@ -1,6 +1,6 @@
-import { Activity, Boxes, Building2, ClipboardList, Gauge, LogOut, Menu, Printer, Radio, X } from "lucide-react";
-import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Activity, ArrowLeftRight, Boxes, Building2, ChevronDown, ClipboardList, Gauge, KeyRound, LogOut, Menu, Printer, Radio, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthProvider";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -20,6 +20,15 @@ export function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [assetManagementOpen, setAssetManagementOpen] = useState(
+    pathname === "/inventory" || pathname.startsWith("/locations"),
+  );
+  const [firePlanOpen, setFirePlanOpen] = useState(pathname.startsWith("/fireplan"));
+  useEffect(() => {
+    if (pathname === "/inventory" || pathname.startsWith("/locations")) setAssetManagementOpen(true);
+    if (pathname.startsWith("/fireplan")) setFirePlanOpen(true);
+  }, [pathname]);
   const logout = async () => {
     try {
       await signOut();
@@ -31,7 +40,6 @@ export function AppLayout() {
 
   const links = [
     { to: "/", label: "Dashboard", icon: Gauge, end: true },
-    { to: "/tasks", label: "Background tasks", icon: Activity, end: false },
     { to: "/pagers", label: "Pagers", icon: Radio, end: false },
   ];
 
@@ -53,29 +61,44 @@ export function AppLayout() {
             </NavLink>)}
           </nav>
         </div>
-        {user?.is_staff && <div className="border-t px-4 py-5">
+        <div className="border-t px-4 py-5">
           <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Beheer</p>
           <nav className="space-y-1">
-            <NavLink to="/fireplan/inventories" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
-              <ClipboardList className="h-4 w-4" />FirePlan-inventarissen
+            <NavLink to="/tasks" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+              <Activity className="h-4 w-4" />Background tasks
             </NavLink>
-            <NavLink to="/fireplan" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
-              <Radio className="h-4 w-4" />Fireplan
+            {user?.is_staff && <>
+            <button type="button" aria-expanded={assetManagementOpen} aria-controls="asset-management-links" onClick={() => setAssetManagementOpen((open) => !open)} className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm ${pathname === "/inventory" || pathname.startsWith("/locations") ? "font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+              <Boxes className="h-4 w-4" />Assetbeheer<ChevronDown className={`ml-auto h-4 w-4 transition-transform ${assetManagementOpen ? "rotate-180" : ""}`} />
+            </button>
+            {assetManagementOpen && <div id="asset-management-links" className="space-y-1 pl-4">
+              <NavLink to="/inventory" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+                <ArrowLeftRight className="h-4 w-4" />Toewijzingen
+              </NavLink>
+              <NavLink to="/locations" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+                <Building2 className="h-4 w-4" />Locaties
+              </NavLink>
+            </div>}
+            <button type="button" aria-expanded={firePlanOpen} aria-controls="fireplan-links" onClick={() => setFirePlanOpen((open) => !open)} className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm ${pathname.startsWith("/fireplan") ? "font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+              <Radio className="h-4 w-4" />FirePlan<ChevronDown className={`ml-auto h-4 w-4 transition-transform ${firePlanOpen ? "rotate-180" : ""}`} />
+            </button>
+            {firePlanOpen && <div id="fireplan-links" className="space-y-1 pl-4">
+              <NavLink to="/fireplan/inventories" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+                <ClipboardList className="h-4 w-4" />Inventarissen
+              </NavLink>
+              <NavLink to="/fireplan" end onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+                <KeyRound className="h-4 w-4" />Credentials
+              </NavLink>
+            </div>}
+            <NavLink to="/citygis" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+              <CityGISIcon className="h-4 w-4 shrink-0" />CityGIS
             </NavLink>
             <NavLink to="/labelprinters" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
               <Printer className="h-4 w-4" />Labelprinters
             </NavLink>
-            <NavLink to="/inventory" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
-              <Boxes className="h-4 w-4" />Inventaris
-            </NavLink>
-            <NavLink to="/citygis" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
-              <CityGISIcon className="h-4 w-4 shrink-0" />CityGIS
-            </NavLink>
-            <NavLink to="/locations" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
-              <Building2 className="h-4 w-4" />Locaties
-            </NavLink>
+            </>}
           </nav>
-        </div>}
+        </div>
         <div className="mt-auto border-t p-4">
           <div className="mb-3 flex items-center gap-3 px-2">
             <div className="grid h-8 w-8 place-items-center border bg-muted text-xs font-semibold">{user?.username.slice(0, 2).toUpperCase()}</div>

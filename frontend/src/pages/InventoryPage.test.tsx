@@ -142,7 +142,7 @@ describe("InventoryPage", () => {
   it("opens the existing pager dialog after scanning a registered pager", async () => {
     const user = userEvent.setup();
     render(<InventoryPage />);
-    await screen.findByRole("heading", { name: "Inventaris" });
+    await screen.findByRole("heading", { name: "Toewijzingen" });
 
     await user.click(screen.getByRole("button", { name: "Scanmodus inschakelen" }));
     await user.type(screen.getByLabelText("Scaninvoer"), "QR-1{Enter}");
@@ -155,7 +155,7 @@ describe("InventoryPage", () => {
     const user = userEvent.setup();
     mockedApi.scanPager.mockRejectedValueOnce(new Error("Onbekende QR-code."));
     render(<InventoryPage />);
-    await screen.findByRole("heading", { name: "Inventaris" });
+    await screen.findByRole("heading", { name: "Toewijzingen" });
 
     await user.click(screen.getByRole("button", { name: "Scanmodus inschakelen" }));
     await user.type(screen.getByLabelText("Scaninvoer"), "QR-UNKNOWN{Enter}");
@@ -168,7 +168,7 @@ describe("InventoryPage", () => {
     const user = userEvent.setup();
     mockedApi.scanPager.mockResolvedValueOnce({ raw_scan: "QR-2", pager: inventory.pagers[1] });
     render(<InventoryPage />);
-    await screen.findByRole("heading", { name: "Inventaris" });
+    await screen.findByRole("heading", { name: "Toewijzingen" });
     await user.selectOptions(screen.getByRole("combobox", { name: "Type managed object" }), "vector");
     await user.click(screen.getByRole("button", { name: "Beheer koppelingen voor vector P-AND2" }));
     const dialog = screen.getByRole("dialog", { name: "Vector P-AND2" });
@@ -188,7 +188,7 @@ describe("InventoryPage", () => {
     });
     mockedApi.scanPager.mockResolvedValueOnce({ raw_scan: "QR-1", pager: inventory.pagers[0] });
     render(<InventoryPage />);
-    await screen.findByRole("heading", { name: "Inventaris" });
+    await screen.findByRole("heading", { name: "Toewijzingen" });
     await user.selectOptions(screen.getByRole("combobox", { name: "Type managed object" }), "vector");
     await user.click(screen.getByRole("button", { name: "Beheer koppelingen voor vector P-AND2" }));
     const dialog = screen.getByRole("dialog", { name: "Vector P-AND2" });
@@ -204,7 +204,7 @@ describe("InventoryPage", () => {
     const user = userEvent.setup();
     mockedApi.scanPager.mockRejectedValueOnce(new Error("Onbekende QR-code."));
     render(<InventoryPage />);
-    await screen.findByRole("heading", { name: "Inventaris" });
+    await screen.findByRole("heading", { name: "Toewijzingen" });
     await user.selectOptions(screen.getByRole("combobox", { name: "Type managed object" }), "vector");
     await user.click(screen.getByRole("button", { name: "Beheer koppelingen voor vector P-AND2" }));
     const dialog = screen.getByRole("dialog", { name: "Vector P-AND2" });
@@ -220,7 +220,7 @@ describe("InventoryPage", () => {
     const user = userEvent.setup();
     render(<InventoryPage />);
 
-    expect(await screen.findByRole("heading", { name: "Inventaris" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Toewijzingen" })).toBeInTheDocument();
     const typePicker = screen.getByRole("combobox", { name: "Type managed object" });
     expect(typePicker).toHaveValue("pager");
     expect(screen.getByRole("button", { name: "Beheer koppelingen voor pager SN-1" })).toBeInTheDocument();
@@ -271,7 +271,7 @@ describe("InventoryPage", () => {
       pagers: inventory.pagers.map((pager) => pager.id === 2 ? { ...pager, type: { id: 2, name: "RES.Q XS" } } : pager),
     });
     render(<InventoryPage />);
-    await screen.findByRole("heading", { name: "Inventaris" });
+    await screen.findByRole("heading", { name: "Toewijzingen" });
 
     const freePagerRow = screen.getByRole("button", { name: "Beheer koppelingen voor pager SN-2" }).closest("tr") as HTMLElement;
     expect(within(freePagerRow).getAllByRole("cell")[2]).toBeEmptyDOMElement();

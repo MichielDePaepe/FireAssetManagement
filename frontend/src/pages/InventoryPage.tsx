@@ -352,7 +352,7 @@ export function InventoryPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-primary">Assetbeheer</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Inventaris</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Toewijzingen</h1>
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <label className="grid gap-1 text-sm font-medium" htmlFor="managed-object-type">
