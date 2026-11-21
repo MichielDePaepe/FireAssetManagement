@@ -101,7 +101,7 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 SPECTACULAR_SETTINGS = {
-    "TITLE": os.getenv("APP_TITLE", "Web Project Starter") + " API",
+    "TITLE": os.getenv("APP_TITLE", "Fire Asset Management") + " API",
     "DESCRIPTION": "Task and pager asset API.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,

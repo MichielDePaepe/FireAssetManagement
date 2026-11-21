@@ -7,7 +7,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { FireplanTaskMonitor } from "@/components/FireplanTaskMonitor";
 import { Button } from "@/components/ui/button";
 
-const title = import.meta.env.VITE_APP_TITLE || "Web Project Starter";
+const title = import.meta.env.VITE_APP_TITLE || "Fire Asset Management";
 
 function CityGISIcon({ className }: { className?: string }) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>

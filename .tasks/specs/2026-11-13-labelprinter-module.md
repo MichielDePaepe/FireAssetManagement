@@ -1,6 +1,6 @@
 ---
 kind: bootstrap
-title: Pager Asset Management
+title: Fire Asset Management
 repo: private
 date: 2026-11-13
 goal: |

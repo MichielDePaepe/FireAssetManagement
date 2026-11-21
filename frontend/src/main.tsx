@@ -20,7 +20,7 @@ const LocationsPage = lazy(() => import("@/pages/LocationsPage").then((module) =
 const FireplanInventoriesPage = lazy(() => import("@/pages/FireplanInventoriesPage").then((module) => ({ default: module.FireplanInventoriesPage })));
 const FireplanInventoryDetailPage = lazy(() => import("@/pages/FireplanInventoryDetailPage").then((module) => ({ default: module.FireplanInventoryDetailPage })));
 
-document.title = import.meta.env.VITE_APP_TITLE || "Web Project Starter";
+document.title = import.meta.env.VITE_APP_TITLE || "Fire Asset Management";
 
 function ProtectedLayout() {
   const { user, loading } = useAuth();

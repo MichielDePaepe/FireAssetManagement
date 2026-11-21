@@ -37,7 +37,7 @@ class FireplanInventoryClient:
         self.opener = _opener(self.cookie_jar, self.expected_origin)
         self.mapping = load_inventory_mapping()
         self.headers = {
-            "User-Agent": "PagerAssetManagement/1.0 (Fireplan integration)",
+            "User-Agent": "FireAssetManagement/1.0 (Fireplan integration)",
             "Accept": "application/json",
         }
 

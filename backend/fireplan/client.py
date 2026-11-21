@@ -143,7 +143,7 @@ def _opener(cookie_jar: CookieJar, expected_origin: str):
 def _read_home(opener, base_url: str, expected_origin: str) -> str | None:
     home_url = urljoin(f"{base_url}/", "fr/")
     request = Request(
-        home_url, headers={"User-Agent": "PagerAssetManagement/1.0 (Fireplan integration)"}
+        home_url, headers={"User-Agent": "FireAssetManagement/1.0 (Fireplan integration)"}
     )
     try:
         with opener.open(request, timeout=12) as response:
@@ -189,7 +189,7 @@ def ensure_fireplan_session(
     cookie_jar = CookieJar()
     opener = _opener(cookie_jar, parsed_base.netloc)
     login_url = urljoin(f"{base_url}/", "fr/login")
-    headers = {"User-Agent": "PagerAssetManagement/1.0 (Fireplan integration)"}
+    headers = {"User-Agent": "FireAssetManagement/1.0 (Fireplan integration)"}
     try:
         with opener.open(Request(login_url, headers=headers), timeout=12) as response:
             if not _same_fireplan_origin(response.geturl(), parsed_base.netloc):
@@ -270,7 +270,7 @@ def fetch_inventory_qr_codes(
     records: list[dict] = []
     total: int | None = None
     headers = {
-        "User-Agent": "PagerAssetManagement/1.0 (Fireplan integration)",
+        "User-Agent": "FireAssetManagement/1.0 (Fireplan integration)",
         "Accept": "application/json",
     }
 

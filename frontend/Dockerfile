@@ -9,7 +9,7 @@ EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 FROM base AS build
-ARG APP_TITLE="Web Project Starter"
+ARG APP_TITLE="Fire Asset Management"
 ENV VITE_APP_TITLE=$APP_TITLE
 RUN npm run build
 

@@ -1,6 +1,6 @@
-# Pager Asset Management
+# Fire Asset Management
 
-Pager Asset Management is a web application for managing pager assets, built on a reusable React + Django foundation with background jobs, live progress, Docker Compose, and GitHub Actions.
+Fire Asset Management is a web application for managing operational assets and records, built on a reusable React + Django foundation with background jobs, live progress, Docker Compose, and GitHub Actions.
 
 ## Quick start
 
