@@ -1,7 +1,7 @@
 ---
 title: Pager Asset Management
-status: done
-current-phase: 19
+status: in-progress
+current-phase: 20
 repo: private
 github: ~
 created: 2026-11-14
@@ -29,6 +29,10 @@ Add a staff-managed label-printer module to the pager asset application. Initial
 - [x] Phase 17: Reusable scan controls
 - [x] Phase 18: Pager scan flows
 - [x] Phase 19: Verification and documentation
+- [ ] Phase 20: FirePlan-contract en mapping
+- [ ] Phase 21: Opslag en Celery-synchronisatie
+- [ ] Phase 22: Beheerinterface
+- [ ] Phase 23: Verificatie en documentatie
 
 ## Specs
 - specs/2026-11-13-labelprinter-module.md (bootstrap) → phases 1-2
@@ -38,3 +42,4 @@ Add a staff-managed label-printer module to the pager asset application. Initial
 - specs/2026-11-16-locatiebeheer.md (extension) → phases 12-14
 - specs/2026-11-16-locatie-sorteervolgorde.md (extension) → phase 15
 - specs/2026-11-16-qr-asset-scanning.md (extension) → phases 16-19
+- specs/2026-11-21-fireplan-inventarissynchronisatie.md (extension) → phases 20-23
