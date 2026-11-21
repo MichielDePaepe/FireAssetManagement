@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -8,12 +9,16 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import {
+  ArrowDown,
+  ArrowDownUp,
+  ArrowUp,
   CloudDownload,
   History,
   Pencil,
   Plus,
   Radio,
   RotateCw,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
@@ -32,6 +37,14 @@ interface PagerFormState {
 
 const emptyForm: PagerFormState = { serial_number: "", type_id: "" };
 
+type SortDirection = "ascending" | "descending";
+type PagerSortColumn = "serial_number" | "type";
+type RicCodeSortColumn = "ric_code" | "adc_code" | "alias";
+
+function compareTableText(left: string, right: string): number {
+  return left.localeCompare(right, "nl-BE", { numeric: true, sensitivity: "base" });
+}
+
 export function PagersPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -45,6 +58,16 @@ export function PagersPage() {
   const [form, setForm] = useState<PagerFormState>(emptyForm);
   const [formOpen, setFormOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"devices" | "codes">("devices");
+  const [pagerQuery, setPagerQuery] = useState("");
+  const [codeQuery, setCodeQuery] = useState("");
+  const [pagerSort, setPagerSort] = useState<{ column: PagerSortColumn; direction: SortDirection }>({
+    column: "serial_number",
+    direction: "ascending",
+  });
+  const [codeSort, setCodeSort] = useState<{ column: RicCodeSortColumn; direction: SortDirection }>({
+    column: "ric_code",
+    direction: "ascending",
+  });
   const [ricCodes, setRicCodes] = useState<RicCode[]>([]);
   const [codesLoading, setCodesLoading] = useState(false);
   const [codeError, setCodeError] = useState("");
@@ -61,6 +84,40 @@ export function PagersPage() {
   const [activeSyncId, setActiveSyncId] = useState(
     () => window.localStorage.getItem("activeFireplanSyncId") ?? "",
   );
+
+  const sortedPagers = useMemo(() => {
+    const direction = pagerSort.direction === "ascending" ? 1 : -1;
+    const needle = pagerQuery.trim().toLocaleLowerCase("nl-BE");
+    return pagers.filter((pager) => !needle || [pager.serial_number, pager.type.name]
+      .some((value) => value.toLocaleLowerCase("nl-BE").includes(needle))).sort((left, right) => {
+      const leftValue = pagerSort.column === "serial_number" ? left.serial_number : left.type.name;
+      const rightValue = pagerSort.column === "serial_number" ? right.serial_number : right.type.name;
+      return compareTableText(leftValue, rightValue) * direction || left.id - right.id;
+    });
+  }, [pagerQuery, pagers, pagerSort]);
+
+  const sortedRicCodes = useMemo(() => {
+    const direction = codeSort.direction === "ascending" ? 1 : -1;
+    const needle = codeQuery.trim().toLocaleLowerCase("nl-BE");
+    return ricCodes.filter((code) => !needle || [code.ric_code, code.adc_code, code.alias]
+      .some((value) => value.toLocaleLowerCase("nl-BE").includes(needle))).sort((left, right) => {
+      return compareTableText(left[codeSort.column], right[codeSort.column]) * direction || left.id - right.id;
+    });
+  }, [codeQuery, codeSort, ricCodes]);
+
+  const togglePagerSort = (column: PagerSortColumn) => {
+    setPagerSort((current) => ({
+      column,
+      direction: current.column === column && current.direction === "ascending" ? "descending" : "ascending",
+    }));
+  };
+
+  const toggleCodeSort = (column: RicCodeSortColumn) => {
+    setCodeSort((current) => ({
+      column,
+      direction: current.column === column && current.direction === "ascending" ? "descending" : "ascending",
+    }));
+  };
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -353,17 +410,24 @@ export function PagersPage() {
 
       {activeTab === "devices" && (
         <Card>
-          <CardHeader>
-            <CardTitle>Toestellen</CardTitle>
-            <CardDescription>
-              {pagers.length} {pagers.length === 1 ? "pager" : "pagers"} geregistreerd
-            </CardDescription>
+          <CardHeader className="flex-col items-stretch gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div>
+              <CardTitle>Toestellen</CardTitle>
+              <CardDescription>
+                {pagers.length} {pagers.length === 1 ? "pager" : "pagers"} geregistreerd
+              </CardDescription>
+            </div>
+            <label className="relative w-full sm:w-72">
+              <span className="sr-only">Pagers zoeken</span>
+              <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-9" value={pagerQuery} onChange={(event) => setPagerQuery(event.target.value)} placeholder="Zoek pager of type" />
+            </label>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {error ? (
               <div
                 role="alert"
-                className="flex items-center justify-between border-l-2 border-red-500 bg-red-50 p-4 text-sm"
+                className="m-4 flex items-center justify-between border-l-2 border-red-500 bg-red-50 p-4 text-sm"
               >
                 {error}
                 <Button variant="outline" size="sm" onClick={() => void refresh()}>
@@ -371,11 +435,11 @@ export function PagersPage() {
                 </Button>
               </div>
             ) : loading ? (
-              <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
                 <RotateCw className="h-4 w-4 animate-spin" />Pagers laden…
               </div>
             ) : pagers.length === 0 ? (
-              <div className="py-12 text-center">
+              <div className="p-12 text-center">
                 <Radio className="mx-auto h-8 w-8 text-muted-foreground" />
                 <p className="mt-3 text-sm font-medium">Nog geen pagers</p>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -384,20 +448,36 @@ export function PagersPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
-                      <th scope="col" className="py-3 pr-4 font-medium">Serienummer</th>
-                      <th scope="col" className="py-3 pr-4 font-medium">Type</th>
-                      <th scope="col" className="py-3 text-right font-medium">Acties</th>
+                <table className="w-full min-w-[640px] table-fixed border-collapse text-left text-sm">
+                  <colgroup>
+                    <col className="w-[42%]" />
+                    <col className="w-[38%]" />
+                    <col className="w-[20%]" />
+                  </colgroup>
+                  <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
+                    <tr>
+                      {([
+                        ["serial_number", "Serienummer"],
+                        ["type", "Type"],
+                      ] as const).map(([column, label]) => {
+                        const active = pagerSort.column === column;
+                        const Icon = !active ? ArrowDownUp : pagerSort.direction === "ascending" ? ArrowUp : ArrowDown;
+                        return <th key={column} scope="col" aria-sort={active ? pagerSort.direction : undefined} className="px-4 py-3 align-middle font-normal">
+                          <button type="button" className="inline-flex items-center gap-2 whitespace-nowrap font-medium" aria-label={`Sorteer op ${label.toLocaleLowerCase("nl-BE")}`} onClick={() => togglePagerSort(column)}>
+                            {label}<Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                          </button>
+                        </th>;
+                      })}
+                      <th scope="col" className="px-4 py-3 text-right align-middle font-medium">Acties</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {pagers.map((pager) => (
+                    {sortedPagers.length === 0 && <tr><td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">Geen pagers gevonden voor deze zoekopdracht.</td></tr>}
+                    {sortedPagers.map((pager) => (
                       <tr key={pager.id} className="hover:bg-muted/30">
-                        <td className="py-3 pr-4 font-medium">{pager.serial_number}</td>
-                        <td className="py-3 pr-4">{pager.type.name}</td>
-                        <td className="py-3 text-right">
+                        <td className="px-4 py-3 font-medium">{pager.serial_number}</td>
+                        <td className="px-4 py-3">{pager.type.name}</td>
+                        <td className="px-4 py-3 text-right">
                           <div className="inline-flex gap-1">
                             <Button
                               variant="ghost"
@@ -431,31 +511,56 @@ export function PagersPage() {
 
       {activeTab === "codes" && (
         <Card>
-          <CardHeader>
-            <CardTitle>RiC-codes</CardTitle>
-            <CardDescription>
-              {ricCodes.length} {ricCodes.length === 1 ? "combinatie" : "combinaties"} geregistreerd
-            </CardDescription>
+          <CardHeader className="flex-col items-stretch gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div>
+              <CardTitle>RiC-codes</CardTitle>
+              <CardDescription>
+                {ricCodes.length} {ricCodes.length === 1 ? "combinatie" : "combinaties"} geregistreerd
+              </CardDescription>
+            </div>
+            <label className="relative w-full sm:w-72">
+              <span className="sr-only">RiC-codes zoeken</span>
+              <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-9" value={codeQuery} onChange={(event) => setCodeQuery(event.target.value)} placeholder="Zoek RiC, AdC of alias" />
+            </label>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {codeError && <p role="alert" className="text-sm text-red-700">{codeError}</p>}
-            {codesLoading ? <p className="text-sm text-muted-foreground">RiC-codes laden…</p> : (
+          <CardContent className="p-0">
+            {codeError && <p role="alert" className="m-4 text-sm text-red-700">{codeError}</p>}
+            {codesLoading ? <p className="p-8 text-sm text-muted-foreground">RiC-codes laden…</p> : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
-                      <th scope="col" className="py-3 pr-4 font-medium">RiC</th>
-                      <th scope="col" className="py-3 pr-4 font-medium">AdC</th>
-                      <th scope="col" className="py-3 pr-4 font-medium">Alias</th>
-                      <th scope="col" className="py-3 text-right font-medium">Acties</th>
+                <table className="w-full min-w-[640px] table-fixed border-collapse text-left text-sm">
+                  <colgroup>
+                    <col className="w-[18%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[44%]" />
+                    <col className="w-[20%]" />
+                  </colgroup>
+                  <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
+                    <tr>
+                      {([
+                        ["ric_code", "RiC"],
+                        ["adc_code", "AdC"],
+                        ["alias", "Alias"],
+                      ] as const).map(([column, label]) => {
+                        const active = codeSort.column === column;
+                        const Icon = !active ? ArrowDownUp : codeSort.direction === "ascending" ? ArrowUp : ArrowDown;
+                        return <th key={column} scope="col" aria-sort={active ? codeSort.direction : undefined} className="px-4 py-3 align-middle font-normal">
+                          <button type="button" className="inline-flex items-center gap-2 whitespace-nowrap font-medium" aria-label={`Sorteer op ${label.toLocaleLowerCase("nl-BE")}`} onClick={() => toggleCodeSort(column)}>
+                            {label}<Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                          </button>
+                        </th>;
+                      })}
+                      <th scope="col" className="px-4 py-3 text-right align-middle font-medium">Acties</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">{ricCodes.map((code) => (
+                  <tbody className="divide-y">
+                    {sortedRicCodes.length === 0 && ricCodes.length > 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Geen RiC-codes gevonden voor deze zoekopdracht.</td></tr>}
+                    {sortedRicCodes.map((code) => (
                     <tr key={code.id} className="hover:bg-muted/30">
-                      <td className="py-3 pr-4 font-medium">{code.ric_code}</td>
-                      <td className="py-3 pr-4">{code.adc_code}</td>
-                      <td className="py-3 pr-4">{code.alias}</td>
-                      <td className="py-3 text-right">
+                        <td className="px-4 py-3 font-medium">{code.ric_code}</td>
+                        <td className="px-4 py-3">{code.adc_code}</td>
+                        <td className="px-4 py-3">{code.alias}</td>
+                        <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-1">
                           <Button
                             variant="ghost"
@@ -491,7 +596,7 @@ export function PagersPage() {
                   ))}</tbody>
                 </table>
                 {ricCodes.length === 0 && (
-                  <p className="py-4 text-sm text-muted-foreground">Nog geen RiC-codes geregistreerd.</p>
+                  <p className="p-8 text-sm text-muted-foreground">Nog geen RiC-codes geregistreerd.</p>
                 )}
               </div>
             )}

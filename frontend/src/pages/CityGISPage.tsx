@@ -300,7 +300,7 @@ export function CityGISPage() {
     const filterOpen = filterColumn !== undefined && openFilter?.column === filterColumn;
     return <th key={column} aria-sort={active ? sortDirection : undefined} className="!rounded-none px-4 py-3 align-middle">
       <div className="flex min-h-6 items-center gap-2 whitespace-nowrap">
-        <button type="button" className="inline-flex items-center gap-2 leading-6 font-semibold" aria-label={`Sorteer op ${label}`} onClick={() => toggleSort(column)}>
+        <button type="button" className="inline-flex items-center gap-2 leading-6 font-medium" aria-label={`Sorteer op ${label}`} onClick={() => toggleSort(column)}>
           {label}<Icon aria-hidden="true" className="h-3.5 w-3.5" />
         </button>
         {filterColumn && <button
@@ -365,7 +365,7 @@ export function CityGISPage() {
             <col className="w-[34%]" />
             <col className="w-[18%]" />
           </colgroup>
-          <thead className="border-b bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground"><tr>
+          <thead className="border-b bg-muted/50 text-xs text-muted-foreground"><tr>
             {sortHeader("vector", "Vector")}
             {sortHeader("service", "Dienst", "service")}
             {sortHeader("type", "Type", "type")}

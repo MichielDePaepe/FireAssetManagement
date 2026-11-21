@@ -38,6 +38,24 @@ describe("PagerScanControl", () => {
     expect(screen.getByRole("button", { name: "Scanmodus inschakelen" })).toBeInTheDocument();
   });
 
+  it("deactivates keyboard scan mode when focus moves to another field", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <PagerScanControl onScan={vi.fn()} />
+        <input aria-label="Ander veld" />
+      </>,
+    );
+
+    const scanButton = screen.getByRole("button", { name: "Scanmodus inschakelen" });
+    await user.click(scanButton);
+    expect(screen.getByRole("button", { name: "Scanmodus uitschakelen" })).toHaveClass("bg-destructive");
+
+    await user.click(screen.getByRole("textbox", { name: "Ander veld" }));
+
+    expect(screen.getByRole("button", { name: "Scanmodus inschakelen" })).toBeInTheDocument();
+  });
+
   it("stops the camera after one decoded scan", async () => {
     const user = userEvent.setup();
     const onScan = vi.fn().mockResolvedValue(undefined);

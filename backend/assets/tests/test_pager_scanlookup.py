@@ -54,6 +54,27 @@ def test_scanlookup_matches_documented_keyboard_layout_variant(scan_client, page
     assert response.json()["pager"]["id"] == pager.id
 
 
+def test_scanlookup_matches_mixed_qwerty_to_azerty_scan(scan_client):
+    expected_url = "https://infoscan.firebru.brussels?data=1,1,1622,1845"
+    expected_pager = Pager.objects.create(
+        serial_number="SN-SCAN-MIXED",
+        type=PagerType.objects.first(),
+        fireplan_id=1622,
+        fireplan_qr_url=expected_url,
+    )
+    raw_scan = "https.>>infoscqn<firebru<brusselsMdqtq/!m!m!^@@m!*$%"
+
+    response = scan_client.post(
+        reverse("pager-scanlookup"),
+        data={"scanned_line": raw_scan},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["raw_scan"] == raw_scan
+    assert response.json()["pager"]["id"] == expected_pager.id
+
+
 def test_scanlookup_matches_exactly_doubled_scan(scan_client, pager):
     response = scan_client.post(
         reverse("pager-scanlookup"),

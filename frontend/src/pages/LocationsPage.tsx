@@ -284,7 +284,7 @@ export function LocationsPage() {
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Locaties</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">Beheer posten, gebouwen en lokalen. CityGIS-diensten en operationele gegevens blijven bronbeheerd.</p>
       </div>
-      <Button onClick={() => openCreateForm(null)}><Plus className="h-4 w-4" />Locatie toevoegen</Button>
+      <Button size="icon" aria-label="Locatie toevoegen" title="Locatie toevoegen" onClick={() => openCreateForm(null)}><Plus className="h-4 w-4" /></Button>
     </div>
 
     {error && <div role="alert" className="border-l-2 border-red-500 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
@@ -372,9 +372,9 @@ export function LocationsPage() {
                 <CardDescription>{selectedLocation.parent_id === null ? "Hoofdniveau" : `Onderdeel van ${locations.find((location) => location.id === selectedLocation.parent_id)?.name ?? "andere locatie"}`}</CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => openCreateForm(selectedLocation.id)}><Plus className="h-4 w-4" />Onderlocatie toevoegen</Button>
-                <Button variant="outline" size="sm" aria-label={`Locatie bewerken ${selectedLocation.name}`} onClick={() => openEditForm(selectedLocation)}><Pencil className="h-4 w-4" />Bewerken</Button>
-                {!hasChildren(selectedLocation) && selectedLocation.service_id === null && <Button variant="destructive" size="sm" aria-label={`Verwijder locatie ${selectedLocation.name}`} onClick={() => void removeLocation(selectedLocation)} disabled={deleting}><Trash2 className="h-4 w-4" />Verwijderen</Button>}
+                <Button variant="outline" size="icon" aria-label={`Onderlocatie toevoegen aan ${selectedLocation.name}`} title={`Onderlocatie toevoegen aan ${selectedLocation.name}`} onClick={() => openCreateForm(selectedLocation.id)}><Plus className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" aria-label={`Locatie bewerken: ${selectedLocation.name}`} title={`Locatie bewerken: ${selectedLocation.name}`} onClick={() => openEditForm(selectedLocation)}><Pencil className="h-4 w-4" /></Button>
+                {!hasChildren(selectedLocation) && selectedLocation.service_id === null && <Button variant="destructive" size="icon" aria-label={`Locatie verwijderen: ${selectedLocation.name}`} title={`Locatie verwijderen: ${selectedLocation.name}`} onClick={() => void removeLocation(selectedLocation)} disabled={deleting}><Trash2 className="h-4 w-4" /></Button>}
               </div>
             </div>
           </CardHeader>

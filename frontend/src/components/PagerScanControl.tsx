@@ -17,6 +17,7 @@ export function PagerScanControl({ onScan }: PagerScanControlProps) {
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [cssZoom, setCssZoom] = useState(false);
   const [scanFlash, setScanFlash] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
@@ -27,6 +28,20 @@ export function PagerScanControl({ onScan }: PagerScanControlProps) {
 
   useEffect(() => {
     if (keyboardMode) inputRef.current?.focus();
+  }, [keyboardMode]);
+
+  useEffect(() => {
+    if (!keyboardMode) return;
+    const deactivateOutside = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Node && !rootRef.current?.contains(target)) setKeyboardMode(false);
+    };
+    document.addEventListener("pointerdown", deactivateOutside, true);
+    document.addEventListener("focusin", deactivateOutside, true);
+    return () => {
+      document.removeEventListener("pointerdown", deactivateOutside, true);
+      document.removeEventListener("focusin", deactivateOutside, true);
+    };
   }, [keyboardMode]);
 
   function stopCamera() {
@@ -135,10 +150,10 @@ export function PagerScanControl({ onScan }: PagerScanControlProps) {
   }, []);
 
   return (
-    <div className="flex shrink-0 items-center gap-1.5">
+    <div ref={rootRef} className="flex shrink-0 items-center gap-1.5">
       <Button
         type="button"
-        variant={keyboardMode ? "secondary" : "outline"}
+        variant={keyboardMode ? "destructive" : "outline"}
         onClick={() => setKeyboardMode((active) => !active)}
         disabled={cameraMode || pending}
         aria-pressed={keyboardMode}
