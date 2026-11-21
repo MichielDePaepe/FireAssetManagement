@@ -4,15 +4,22 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0002_physicallocationobservation_managedrelationship'),
+        ("inventory", "0002_physicallocationobservation_managedrelationship"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='managedobject',
-            name='kind',
-            field=models.CharField(choices=[('pager', 'Pager'), ('radio', 'Radio'), ('vehicle', 'Vehicle'), ('vector', 'Vector')], max_length=20),
+            model_name="managedobject",
+            name="kind",
+            field=models.CharField(
+                choices=[
+                    ("pager", "Pager"),
+                    ("radio", "Radio"),
+                    ("vehicle", "Vehicle"),
+                    ("vector", "Vector"),
+                ],
+                max_length=20,
+            ),
         ),
     ]

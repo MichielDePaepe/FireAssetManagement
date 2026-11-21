@@ -6,55 +6,151 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('assets', '0009_riccodevectorrelationship'),
-        ('inventory', '0003_alter_managedobject_kind'),
+        ("assets", "0009_riccodevectorrelationship"),
+        ("inventory", "0003_alter_managedobject_kind"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='RadioModel',
+            name="RadioModel",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('manufacturer', models.CharField(max_length=100)),
-                ('name', models.CharField(max_length=120)),
-                ('application', models.CharField(choices=[('portable', 'Draagbaar'), ('vehicle', 'Voertuiggebonden'), ('fixed', 'Vast')], max_length=20)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("manufacturer", models.CharField(max_length=100)),
+                ("name", models.CharField(max_length=120)),
+                (
+                    "application",
+                    models.CharField(
+                        choices=[
+                            ("portable", "Draagbaar"),
+                            ("vehicle", "Voertuiggebonden"),
+                            ("fixed", "Vast"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['manufacturer', 'name'],
-                'constraints': [models.UniqueConstraint(fields=('manufacturer', 'name', 'application'), name='uniq_radio_model_application')],
+                "ordering": ["manufacturer", "name"],
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("manufacturer", "name", "application"),
+                        name="uniq_radio_model_application",
+                    )
+                ],
             },
         ),
         migrations.CreateModel(
-            name='Radio',
+            name="Radio",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('tei', models.CharField(max_length=15, unique=True, validators=[django.core.validators.RegexValidator(message='Een TEI bevat exact 15 hexadecimale tekens.', regex='^[0-9A-Fa-f]{15}$')])),
-                ('manufacturer', models.CharField(blank=True, max_length=100)),
-                ('model_name', models.CharField(blank=True, max_length=120)),
-                ('application', models.CharField(choices=[('portable', 'Draagbaar'), ('vehicle', 'Voertuiggebonden'), ('fixed', 'Vast')], max_length=20)),
-                ('fireplan_id', models.PositiveBigIntegerField(blank=True, null=True, unique=True)),
-                ('fireplan_qr_url', models.URLField(blank=True, max_length=500, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('managed_object', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='radio', to='inventory.managedobject')),
-                ('model', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='radios', to='assets.radiomodel')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                (
+                    "tei",
+                    models.CharField(
+                        max_length=15,
+                        unique=True,
+                        validators=[
+                            django.core.validators.RegexValidator(
+                                message="Een TEI bevat exact 15 hexadecimale tekens.",
+                                regex="^[0-9A-Fa-f]{15}$",
+                            )
+                        ],
+                    ),
+                ),
+                ("manufacturer", models.CharField(blank=True, max_length=100)),
+                ("model_name", models.CharField(blank=True, max_length=120)),
+                (
+                    "application",
+                    models.CharField(
+                        choices=[
+                            ("portable", "Draagbaar"),
+                            ("vehicle", "Voertuiggebonden"),
+                            ("fixed", "Vast"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                ("fireplan_id", models.PositiveBigIntegerField(blank=True, null=True, unique=True)),
+                ("fireplan_qr_url", models.URLField(blank=True, max_length=500, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "managed_object",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="radio",
+                        to="inventory.managedobject",
+                    ),
+                ),
+                (
+                    "model",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="radios",
+                        to="assets.radiomodel",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['tei'],
+                "ordering": ["tei"],
             },
         ),
         migrations.CreateModel(
-            name='TeiRange',
+            name="TeiRange",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('start_tei', models.CharField(max_length=15, validators=[django.core.validators.RegexValidator(message='Een TEI bevat exact 15 hexadecimale tekens.', regex='^[0-9A-Fa-f]{15}$')])),
-                ('end_tei', models.CharField(max_length=15, validators=[django.core.validators.RegexValidator(message='Een TEI bevat exact 15 hexadecimale tekens.', regex='^[0-9A-Fa-f]{15}$')])),
-                ('model', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tei_ranges', to='assets.radiomodel')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                (
+                    "start_tei",
+                    models.CharField(
+                        max_length=15,
+                        validators=[
+                            django.core.validators.RegexValidator(
+                                message="Een TEI bevat exact 15 hexadecimale tekens.",
+                                regex="^[0-9A-Fa-f]{15}$",
+                            )
+                        ],
+                    ),
+                ),
+                (
+                    "end_tei",
+                    models.CharField(
+                        max_length=15,
+                        validators=[
+                            django.core.validators.RegexValidator(
+                                message="Een TEI bevat exact 15 hexadecimale tekens.",
+                                regex="^[0-9A-Fa-f]{15}$",
+                            )
+                        ],
+                    ),
+                ),
+                (
+                    "model",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="tei_ranges",
+                        to="assets.radiomodel",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['start_tei', 'id'],
+                "ordering": ["start_tei", "id"],
             },
         ),
     ]

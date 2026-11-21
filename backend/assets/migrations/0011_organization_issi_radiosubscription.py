@@ -6,46 +6,94 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('assets', '0010_radiomodel_radio_teirange'),
+        ("assets", "0010_radiomodel_radio_teirange"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Organization',
+            name="Organization",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=160, unique=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("name", models.CharField(max_length=160, unique=True)),
             ],
             options={
-                'ordering': ['name'],
+                "ordering": ["name"],
             },
         ),
         migrations.CreateModel(
-            name='Issi',
+            name="Issi",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('issi', models.CharField(max_length=20, unique=True)),
-                ('alias', models.CharField(max_length=120)),
-                ('organization', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='issis', to='assets.organization')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("issi", models.CharField(max_length=20, unique=True)),
+                ("alias", models.CharField(max_length=120)),
+                (
+                    "organization",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="issis",
+                        to="assets.organization",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['issi'],
+                "ordering": ["issi"],
             },
         ),
         migrations.CreateModel(
-            name='RadioSubscription',
+            name="RadioSubscription",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('started_at', models.DateTimeField(default=django.utils.timezone.now)),
-                ('ended_at', models.DateTimeField(blank=True, null=True)),
-                ('issi', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='subscription_history', to='assets.issi')),
-                ('radio', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='subscription_history', to='assets.radio')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("started_at", models.DateTimeField(default=django.utils.timezone.now)),
+                ("ended_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "issi",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="subscription_history",
+                        to="assets.issi",
+                    ),
+                ),
+                (
+                    "radio",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="subscription_history",
+                        to="assets.radio",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['started_at', 'id'],
-                'constraints': [models.UniqueConstraint(condition=models.Q(('ended_at__isnull', True)), fields=('radio',), name='uniq_active_issi_per_radio'), models.UniqueConstraint(condition=models.Q(('ended_at__isnull', True)), fields=('issi',), name='uniq_active_radio_per_issi')],
+                "ordering": ["started_at", "id"],
+                "constraints": [
+                    models.UniqueConstraint(
+                        condition=models.Q(("ended_at__isnull", True)),
+                        fields=("radio",),
+                        name="uniq_active_issi_per_radio",
+                    ),
+                    models.UniqueConstraint(
+                        condition=models.Q(("ended_at__isnull", True)),
+                        fields=("issi",),
+                        name="uniq_active_radio_per_issi",
+                    ),
+                ],
             },
         ),
     ]

@@ -44,6 +44,14 @@ All API routes are same-origin under `/api`. Vite proxies requests in developmen
 | GET, POST | `/api/pagers/` | List pagers or create a pager |
 | GET, PUT, PATCH, DELETE | `/api/pagers/{id}/` | Retrieve, edit, or delete a pager |
 | POST | `/api/pagers/scanlookup/` | Resolve a scanned Fireplan QR URL against complete stored pager URLs; authenticated |
+| GET, POST | `/api/radios/` | List or create radio assets; authenticated read, staff write |
+| GET, PUT, PATCH, DELETE | `/api/radios/{id}/` | Retrieve, edit, or delete a radio; FirePlan ID and QR URL are read-only |
+| POST | `/api/radios/scanlookup/` | Resolve a scanned FirePlan QR URL against stored radio URLs; authenticated |
+| GET, POST, PUT, PATCH, DELETE | `/api/issis/`, `/api/organizations/`, `/api/radio-models/`, `/api/tei-ranges/` | Read or manage radio reference records; authenticated read, staff write |
+| GET, POST | `/api/radio-subscriptions/` | Read subscription history or assign a current radio/ISSI pair; authenticated read, staff write |
+| GET | `/api/inventory/radios/{id}/relationship/` | Read current radio placement and relationship history; authenticated |
+| PUT | `/api/inventory/radios/{id}/relationship/` | Replace or clear a radio placement; staff only |
+| POST | `/api/fireplan/sync-radios/` | Queue read-only FirePlan radio synchronization; staff only |
 | GET | `/api/pager-types/` | List configured pager types |
 | GET, POST | `/api/ric-codes/` | List or create standalone RiC/AdC code records |
 | GET, PUT, PATCH, DELETE | `/api/ric-codes/{id}/` | Retrieve, edit, or delete a RiC/AdC code record |
@@ -130,7 +138,15 @@ There is no cancellation API. Celery revoke without termination can prevent some
 
 ## Progress and SSE
 
-`celery-progress` records the current/total/percentage in Celery task metadata. The configured `django-celery-results` backend stores that metadata in PostgreSQL. SSE reads the same Celery snapshot and emits it when it changes. While a client is connected, Django checks the stored snapshot once per second; it does not write a second event log or broadcast topic. The per-connection query interval is intentionally simple for a starter and should be tuned for large numbers of simultaneous connections.
+`celery-progress` records the current/total/percentage in Celery task metadata. The configured `django-celery-results` backend stores that metadata in PostgreSQL. SSE reads the same Celery snapshot and emits it when it changes. While a client is connected, Django checks the stored snapshot once per second; it does not write a second event log or broadcast topic. The per-connection query interval is intentionally simple for a starter and should be tuned for large numbers of simultaneous connections. Radio sync uses the same Celery task ID, result backend, progress metadata, SSE stream, task detail, and report UI as the other tasks; its result includes added, updated, unchanged, skipped, and row errors.
+
+## Radio assets and relationships
+
+The `assets` app stores `Radio`, `RadioModel`, `TeiRange`, `Issi`, `Organization`, and `RadioSubscription` in PostgreSQL. Radio has a one-to-one `inventory.ManagedObject(kind="radio")` identity. TEI is a unique text field validated as 14 or 15 hexadecimal characters; matching TEI ranges assign a model, while unmatched TEIs remain valid without a model. Range endpoints are inclusive and overlap is rejected. ISSI is a standalone unique text identifier with an alias and optional protected organization reference. Subscription assignment locks both records, closes any active row involving either record, and creates the new row; partial unique constraints enforce at most one active ISSI per radio and one active radio per ISSI.
+
+Radio placement history reuses `inventory.ManagedRelationship`. Portable radios use `assigned_to` a vector, vehicle-bound radios use `mounted_in` a vehicle, and fixed radios use `installed_in` a CityGIS `Location`. The relationship API's managed-object target IDs are `ManagedObject` IDs, not vector/vehicle table IDs. An unchanged destination is idempotent; clearing ends the current row without creating an empty relationship. These assignments are separate from `PhysicalLocationObservation`.
+
+The staff-only `fireplan.sync_radios` Celery task reads paginated QR inventory through the existing authenticated FirePlan client and uses only the confirmed source names `Radio mobile Astrid` and `Radio portable Astrid`. `id`, `serialNumber`, and `qrCode` populate FirePlan ID, text TEI, and the full QR URL. Upsert matches by FirePlan ID first, then TEI. FirePlan fields cannot be edited through the management API, and synchronization does not delete local-only radios or write to FirePlan. `RadioScanLookup` shares the pager keyboard/camera scanner and QR candidate normalization; identification only selects and displays a radio. A live repeated fetch returned the same IDs and payload immediately; long-term ID stability has not been independently established.
 
 The browser uses native `EventSource`, which reconnects automatically. On every connection the stream immediately sends the latest snapshot, so reconnect does not require replaying an event log. The stream emits keep-alive comments every 15 seconds, disables Nginx response buffering, and closes after a terminal state. Navigating away closes only the SSE connection; it does not affect the Celery task. Refreshing the detail route retrieves the stored status and opens a new stream.
 

@@ -24,7 +24,8 @@ class ManagedObjectMigrationTests(TransactionTestCase):
         self.old_apps = self.migrate(self.migrate_from)
 
     def tearDown(self):
-        self.migrate(self.migrate_to)
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
 
     def test_populated_records_are_preserved_and_typed_links_are_backfilled(self):
         PagerType = self.old_apps.get_model("assets", "PagerType")

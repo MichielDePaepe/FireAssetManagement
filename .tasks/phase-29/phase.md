@@ -1,9 +1,9 @@
 ---
 phase: 29
 title: Documentatie en verificatie
-status: open
+status: closed
 opened: 2026-11-21
-closed: ~
+closed: 2026-11-21
 ---
 ## Goal
 Werk de projectdocumentatie bij en verifieer dat het radiodomein, bronintegratie, historie en beheerinterface passen binnen de vastgelegde architectuur.
@@ -24,5 +24,9 @@ Werk de projectdocumentatie bij en verifieer dat het radiodomein, bronintegratie
 - Er zijn geen nieuwe dependencies, FirePlan-schrijfoperaties, overdrachtsworkflow, inventariscontrole, afwijkingsdetectie, incidentenbeheer of operationele workflow in deze uitbreiding.
 
 ## Tasks
-- [ ] task-01-radio-domain-documentation.md
-- [ ] task-02-full-verification.md
+- [x] task-01-radio-domain-documentation.md
+- [x] task-02-full-verification.md
+
+## Carry-forward
+- Live FirePlan ID stability beyond an immediate repeated fetch remains unverified; retain this qualification wherever the source matching behavior is described.
+- No other open follow-ups remain from this extension.

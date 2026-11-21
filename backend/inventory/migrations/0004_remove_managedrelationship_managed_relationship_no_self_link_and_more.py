@@ -5,33 +5,58 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('citygis', '0008_location_sort_name'),
-        ('inventory', '0003_alter_managedobject_kind'),
+        ("citygis", "0008_location_sort_name"),
+        ("inventory", "0003_alter_managedobject_kind"),
     ]
 
     operations = [
         migrations.RemoveConstraint(
-            model_name='managedrelationship',
-            name='managed_relationship_no_self_link',
+            model_name="managedrelationship",
+            name="managed_relationship_no_self_link",
         ),
         migrations.AddField(
-            model_name='managedrelationship',
-            name='target_location',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='asset_relationships', to='citygis.location'),
+            model_name="managedrelationship",
+            name="target_location",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="asset_relationships",
+                to="citygis.location",
+            ),
         ),
         migrations.AlterField(
-            model_name='managedrelationship',
-            name='target',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='incoming_relationships', to='inventory.managedobject'),
+            model_name="managedrelationship",
+            name="target",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="incoming_relationships",
+                to="inventory.managedobject",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='managedrelationship',
-            constraint=models.CheckConstraint(condition=models.Q(models.Q(('target__isnull', False), ('target_location__isnull', True)), models.Q(('target__isnull', True), ('target_location__isnull', False)), _connector='OR'), name='managed_relationship_one_target'),
+            model_name="managedrelationship",
+            constraint=models.CheckConstraint(
+                condition=models.Q(
+                    models.Q(("target__isnull", False), ("target_location__isnull", True)),
+                    models.Q(("target__isnull", True), ("target_location__isnull", False)),
+                    _connector="OR",
+                ),
+                name="managed_relationship_one_target",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='managedrelationship',
-            constraint=models.CheckConstraint(condition=models.Q(('target__isnull', True), models.Q(('source', models.F('target')), _negated=True), _connector='OR'), name='managed_relationship_no_self_link'),
+            model_name="managedrelationship",
+            constraint=models.CheckConstraint(
+                condition=models.Q(
+                    ("target__isnull", True),
+                    models.Q(("source", models.F("target")), _negated=True),
+                    _connector="OR",
+                ),
+                name="managed_relationship_no_self_link",
+            ),
         ),
     ]
