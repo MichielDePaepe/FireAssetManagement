@@ -1,7 +1,7 @@
 ---
 title: Pager Asset Management
 status: in-progress
-current-phase: 26
+current-phase: 27
 repo: private
 github: ~
 created: 2026-11-14
@@ -35,7 +35,7 @@ Add a staff-managed label-printer module to the pager asset application. Initial
 - [x] Phase 23: Verificatie en documentatie
 - [x] Phase 24: Lokale inventarisdetailpagina
 - [x] Phase 25: Gerichte hersynchronisatie en afronding
-- [ ] Phase 26: Radiodomein en relatiehistoriek
+- [x] Phase 26: Radiodomein en relatiehistoriek
 - [ ] Phase 27: FirePlan-synchronisatie en radio-identificatie
 - [ ] Phase 28: Radio-, ISSI- en abonnementenbeheer
 - [ ] Phase 29: Documentatie en verificatie

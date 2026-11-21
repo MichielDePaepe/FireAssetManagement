@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -6,6 +7,7 @@ from django.utils import timezone
 class ManagedObject(models.Model):
     class Kind(models.TextChoices):
         PAGER = "pager", "Pager"
+        RADIO = "radio", "Radio"
         VEHICLE = "vehicle", "Vehicle"
         VECTOR = "vector", "Vector"
 
@@ -51,7 +53,18 @@ class ManagedRelationship(models.Model):
         ManagedObject, on_delete=models.CASCADE, related_name="outgoing_relationships"
     )
     target = models.ForeignKey(
-        ManagedObject, on_delete=models.CASCADE, related_name="incoming_relationships"
+        ManagedObject,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="incoming_relationships",
+    )
+    target_location = models.ForeignKey(
+        "citygis.Location",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="asset_relationships",
     )
     kind = models.CharField(max_length=24, choices=Kind.choices)
     started_at = models.DateTimeField(default=timezone.now)
@@ -61,7 +74,15 @@ class ManagedRelationship(models.Model):
         ordering = ["started_at", "id"]
         constraints = [
             models.CheckConstraint(
-                condition=~Q(source=models.F("target")), name="managed_relationship_no_self_link"
+                condition=(
+                    Q(target__isnull=False, target_location__isnull=True)
+                    | Q(target__isnull=True, target_location__isnull=False)
+                ),
+                name="managed_relationship_one_target",
+            ),
+            models.CheckConstraint(
+                condition=Q(target__isnull=True) | ~Q(source=models.F("target")),
+                name="managed_relationship_no_self_link",
             ),
             models.UniqueConstraint(
                 fields=["source"],
@@ -69,6 +90,36 @@ class ManagedRelationship(models.Model):
                 name="uniq_active_operational_assignment",
             ),
         ]
+
+    def clean(self):
+        super().clean()
+        if (self.target_id is None) == (self.target_location_id is None):
+            raise ValidationError("Geef precies één relatiebestemming op.")
+        if self.source_id and self.source.kind == ManagedObject.Kind.RADIO:
+            from assets.models import Radio
+            from citygis.models import Vector, Vehicle
+
+            radio = Radio.objects.filter(managed_object_id=self.source_id).first()
+            valid = False
+            if radio and self.kind == self.Kind.ASSIGNED_TO:
+                valid = (
+                    radio.application == Radio.Application.PORTABLE
+                    and self.target_id is not None
+                    and Vector.objects.filter(managed_object_id=self.target_id).exists()
+                )
+            elif radio and self.kind == self.Kind.MOUNTED_IN:
+                valid = (
+                    radio.application == Radio.Application.VEHICLE
+                    and self.target_id is not None
+                    and Vehicle.objects.filter(managed_object_id=self.target_id).exists()
+                )
+            elif radio and self.kind == self.Kind.INSTALLED_IN:
+                valid = (
+                    radio.application == Radio.Application.FIXED
+                    and self.target_location_id is not None
+                )
+            if not valid:
+                raise ValidationError("Deze relatiebestemming past niet bij de radio-toepassing.")
 
     @classmethod
     def assign_operationally(cls, source: ManagedObject, target: ManagedObject):
@@ -92,8 +143,48 @@ class ManagedRelationship(models.Model):
                 kind=cls.Kind.ASSIGNED_TO,
             )
 
+    @classmethod
+    def relate(
+        cls,
+        source: ManagedObject,
+        kind: str,
+        *,
+        target: ManagedObject | None = None,
+        target_location=None,
+    ):
+        if (target is None) == (target_location is None):
+            raise ValueError("Geef precies één relatiebestemming op.")
+        with transaction.atomic():
+            locked_source = ManagedObject.objects.select_for_update().get(pk=source.pk)
+            current = cls.objects.filter(
+                source=locked_source, kind=kind, ended_at__isnull=True
+            ).first()
+            target_id = target.pk if target else None
+            location_id = target_location.pk if target_location else None
+            if (
+                current
+                and current.target_id == target_id
+                and current.target_location_id == location_id
+            ):
+                return current
+            now = timezone.now()
+            if current:
+                current.ended_at = now
+                current.save(update_fields=["ended_at"])
+            relation = cls(
+                source=locked_source,
+                target=target,
+                target_location=target_location,
+                kind=kind,
+                started_at=now,
+            )
+            relation.full_clean()
+            relation.save()
+            return relation
+
     def __str__(self) -> str:
-        return f"{self.source} {self.get_kind_display()} {self.target}"
+        destination = self.target or self.target_location
+        return f"{self.source} {self.get_kind_display()} {destination}"
 
 
 class PhysicalLocationObservation(models.Model):

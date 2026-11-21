@@ -1,12 +1,18 @@
 ---
 phase: 27
 title: FirePlan-synchronisatie en radio-identificatie
-status: pending
-opened: ~
+status: open
+opened: 2026-11-21
 closed: ~
 ---
 ## Goal
 Hergebruik de FirePlan QR-inventarisroute en bestaande task/SSE-infrastructuur voor radiosynchronisatie, en hergebruik de scannerbediening voor radiozoekopdrachten.
+
+## Carry from phase 26
+1. Validate live FirePlan QR records, stable source IDs, supported radio names, and serialNumber TEI representation before finalizing phase 27 import contracts; the local TEI model currently accepts 15 hexadecimal characters as text.
+
+## Open follow-ups from phase 26
+- The phase 25 live Redis broker integration test remains unrun; rerun if the broker is available during final verification.
 
 ## Exit Criteria
 - De huidige FirePlan QR-respons en beschikbare radiotypen worden tegen de bereikbare FirePlan-omgeving gevalideerd; de integratie gebruikt alleen bevestigde velden en meldt eventuele afwijkingen expliciet.

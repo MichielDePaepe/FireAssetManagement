@@ -1,9 +1,9 @@
 ---
 phase: 26
 title: Radiodomein en relatiehistoriek
-status: open
+status: closed
 opened: 2026-11-21
-closed: ~
+closed: 2026-11-21
 ---
 ## Goal
 Voeg radio's, TEI-modelbereiken, organisaties, zelfstandige ISSI-records en historisch traceerbare abonnementen toe aan het bestaande assetdomein.
@@ -24,3 +24,14 @@ Voeg radio's, TEI-modelbereiken, organisaties, zelfstandige ISSI-records en hist
 - Plaatsing en operationele toewijzing blijven afzonderlijke betekenissen; draagbare radio's kunnen aan vectoren worden toegewezen, voertuiggebonden radio's aan voertuigen worden gemonteerd en vaste radio's aan locaties worden geïnstalleerd.
 
 ## Tasks
+- [x] task-01-radio-identity-and-model-ranges.md
+- [x] task-02-issi-organizations-and-subscription-history.md
+- [x] task-03-location-aware-managed-relationships.md
+
+## Carry-forward
+
+### Carry from phase 26
+1. Validate live FirePlan QR records, stable source IDs, supported radio names, and serialNumber TEI representation before finalizing phase 27 import contracts; the local TEI model currently accepts 15 hexadecimal characters as text.
+
+### Open follow-ups from phase 26
+- The phase 25 live Redis broker integration test remains unrun; rerun if the broker is available during final verification.
