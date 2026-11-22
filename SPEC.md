@@ -25,7 +25,7 @@ For pagers, the application records the identifiers and metadata needed to descr
 | FR-007 | Authenticated API clients can start an example task, list recent tasks, and retrieve task status/progress/result by Celery task ID. | REST routes and API tests. |
 | FR-008 | Tasks execute independently of browser sessions, support concurrency, bounded retry rules, time limits, and structured logging. | Celery task configuration and tests. |
 | FR-009 | The browser receives SSE progress updates, reconnects automatically, and restores progress after navigation or refresh. | Django SSE stream, EventSource client, and UI tests. |
-| FR-010 | The interface contains navigation, dashboard, task overview/detail, progress, loading/error states, command palette, notifications, and reusable validated forms. | React routes and components. |
+| FR-010 | The interface contains navigation, a live dashboard overview of posts and current vectors, task overview/detail, progress, loading/error states, command palette, notifications, and reusable validated forms. The dashboard groups vectors by APM, AE, AMB, Rest, and status 90+; status 99 belongs in Rest. Status history reuses CityGIS history. | React routes and components; existing locations/CityGIS APIs and CityGIS SSE stream. |
 | FR-011 | A roughly 30-second example task demonstrates the complete browser/API/broker/worker/result/progress/SSE flow. | Example task defaults to 30 seconds. |
 | FR-012 | Template users can configure project name, app title, Python package, Compose name, ports, and environment values. | `.env.example` and `scripts/configure_project.py`. |
 | FR-013 | `make clean` requires an explicit typed confirmation before deleting persistent data. | Make target checks for `DELETE`. |

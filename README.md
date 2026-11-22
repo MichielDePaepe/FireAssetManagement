@@ -68,6 +68,10 @@ After pushing the code to GitHub, enable **Settings → General → Template rep
 
 `make clean` deletes database and Redis data and cannot be undone.
 
+## Dashboard
+
+The staff dashboard opens on a live overview of posts and their current CityGIS vectors. Vectors are grouped into APM, AE, AMB, Rest, and Status 90+; status 99 always appears in Rest, where CMD, MSERV, and FAUB are shown first. Each column shows available/total counts, with status 0 and 6 counted as available. A colored vertical status bar opens that vector's CityGIS status history. APM, AE, AMB, and Status 90+ show two columns of vectors; Rest shows three. Large groups can be expanded in place. The page loads from the existing locations and CityGIS APIs and updates through the existing CityGIS event stream.
+
 ## Background task flow
 
 1. The browser POSTs to `POST /api/tasks/`; Django responds with Celery's task ID.

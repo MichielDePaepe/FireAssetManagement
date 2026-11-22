@@ -1,109 +1,195 @@
-import { Activity, ArrowRight, CheckCircle2, Clock3, ListTodo, Play, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, ChevronDown, ChevronRight, RefreshCw, Signal, SignalZero } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { StartTaskForm } from "@/components/StartTaskForm";
-import { TaskProgress } from "@/components/TaskProgress";
-import { api, type TaskSnapshot } from "@/lib/api";
-import { taskLabel, taskStatusLabel } from "@/lib/taskPresentation";
+import { CityGISStatusHistoryDialog } from "@/components/CityGISStatusHistoryDialog";
+import { api, subscribeToCityGIS, type CityGISLocation, type CityGISSnapshot, type CityGISVector } from "@/lib/api";
+import { buildPostDashboardRows, type DashboardGroupKey } from "@/lib/dashboardGrouping";
+
+const GROUPS: Array<{ key: DashboardGroupKey; title: string; columns: number; note: string }> = [
+  { key: "apm", title: "APM", columns: 2, note: "Autopompen" },
+  { key: "ae", title: "AE", columns: 2, note: "Ladderwagens" },
+  { key: "amb", title: "AMB", columns: 2, note: "Ziekenwagens" },
+  { key: "rest", title: "Rest", columns: 3, note: "CMD, MSERV, FAUB, 99 en overige types" },
+  { key: "special", title: "Status 90+", columns: 2, note: "Buiten dienst · 99 staat in Rest" },
+];
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "Nog niet vernieuwd";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Nog niet vernieuwd" : new Intl.DateTimeFormat("nl-BE", { dateStyle: "short", timeStyle: "short" }).format(date);
+}
+
+function VectorStatus({ vector, knownStatusCodes, onOpen }: { vector: CityGISVector; knownStatusCodes: Set<string>; onOpen: () => void }) {
+  const hasKnownStatus = Boolean(vector.operational_status_code) && knownStatusCodes.has(vector.operational_status_code);
+  const statusCode = hasKnownStatus ? vector.operational_status_code : "?";
+  const vehicleCode = vector.vehicle?.alphacode || vector.source_vehicle_name || "Onbekend voertuig";
+  const vectorCode = vector.abbreviation || vector.name || vector.vector_code;
+  const color = hasKnownStatus ? vector.status_color : null;
+  const statusDescription = hasKnownStatus ? vector.status_description || "Onbekende status" : "Onbekende status";
+  return <div className="flex min-w-0 items-center gap-1 py-1.5">
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`Bekijk statusgeschiedenis voor ${vehicleCode} · ${vectorCode} · status ${statusCode} · ${statusDescription}`}
+      title={`Status ${statusCode} · ${statusDescription} · Bekijk geschiedenis`}
+      className="flex h-8 w-2 shrink-0 items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    ><span aria-hidden="true" className="block h-7 w-[6px] rounded-none" style={{ backgroundColor: color ?? "#E5E7EB" }} /></button>
+    <span className="min-w-0 whitespace-normal break-words leading-tight">
+      <span className="block whitespace-normal break-words text-xs font-semibold text-foreground">{vehicleCode}</span>
+      <span className="block whitespace-normal break-words text-[10px] text-muted-foreground">{vectorCode}</span>
+    </span>
+  </div>;
+}
+
+function AssetCell({
+  postName,
+  vectors,
+  columns,
+  knownStatusCodes,
+  onStatus,
+}: {
+  postName: string;
+  vectors: CityGISVector[];
+  columns: number;
+  knownStatusCodes: Set<string>;
+  onStatus: (vector: CityGISVector) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleLimit = columns * 3;
+  const shownVectors = expanded ? vectors : vectors.slice(0, visibleLimit);
+  const hiddenCount = vectors.length - shownVectors.length;
+  if (vectors.length === 0) return null;
+  return <div>
+    <>
+      <div className="grid gap-x-2 gap-y-1" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+        {shownVectors.map((vector) => <VectorStatus key={vector.id} vector={vector} knownStatusCodes={knownStatusCodes} onOpen={() => onStatus(vector)} />)}
+      </div>
+      {vectors.length > visibleLimit && <button
+        type="button"
+        className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+      >{expanded ? <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" /> : <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />}{expanded ? `Minder tonen · ${postName}` : `Toon ${hiddenCount} extra · ${postName}`}</button>}
+    </>
+  </div>;
+}
 
 export function DashboardPage() {
-  const [tasks, setTasks] = useState<TaskSnapshot[]>([]);
-  const [activeTask, setActiveTask] = useState<TaskSnapshot | null>(null);
+  const [locations, setLocations] = useState<CityGISLocation[]>([]);
+  const [snapshot, setSnapshot] = useState<CityGISSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
-  const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
+  const [connected, setConnected] = useState(true);
+  const [historyVector, setHistoryVector] = useState<CityGISVector | null>(null);
+  const liveUpdateReceived = useRef(false);
 
   const refresh = useCallback(async () => {
+    setLoading(true);
+    setError("");
     try {
-      setError("");
-      const [recent, savedTaskId] = await Promise.all([api.listTasks(), Promise.resolve(localStorage.getItem("activeTaskId"))]);
-      setTasks(recent);
-      if (savedTaskId) {
-        try { setActiveTask(await api.getTask(savedTaskId)); }
-        catch { localStorage.removeItem("activeTaskId"); setActiveTask(null); }
-      }
+      const [nextLocations, nextSnapshot] = await Promise.all([api.listLocations(), api.getCityGIS()]);
+      setLocations(nextLocations);
+      if (!liveUpdateReceived.current) setSnapshot(nextSnapshot);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not load tasks");
+      setError(reason instanceof Error ? reason.message : "Postenoverzicht kon niet worden geladen.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const unsubscribe = subscribeToCityGIS((nextSnapshot) => {
+      liveUpdateReceived.current = true;
+      if (active) {
+        setSnapshot(nextSnapshot);
+        setError("");
+        setConnected(true);
+      }
+    }, () => {
+      if (active) setConnected(false);
+    });
     void refresh();
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") void refresh();
-    };
-    const interval = window.setInterval(refreshWhenVisible, 5000);
-    window.addEventListener("focus", refreshWhenVisible);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refreshWhenVisible);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
+    return () => { active = false; unsubscribe(); };
   }, [refresh]);
 
-  const start = async (duration: number) => {
-    setStarting(true);
-    try {
-      const started = await api.startTask(duration);
-      localStorage.setItem("activeTaskId", started.task_id);
-      toast.success("Background task started");
-      navigate(`/tasks/${started.task_id}`);
-    } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : "Could not start task");
-    } finally {
-      setStarting(false);
-    }
-  };
+  const rows = useMemo(() => snapshot ? buildPostDashboardRows(locations, snapshot.vectors) : [], [locations, snapshot]);
+  const knownStatusCodes = useMemo(() => new Set(snapshot?.statuses.map((status) => status.code) ?? []), [snapshot]);
+  const hasCurrentVectors = rows.some((row) => Object.values(row.groups).some((group) => group.length > 0));
+  const hasPosts = locations.some((location) => location.kind === "post");
+  const totals = useMemo(() => Object.fromEntries(GROUPS.map(({ key }) => [key, rows.reduce((sum, row) => ({
+    available: sum.available + row.totals[key].available,
+    total: sum.total + row.totals[key].total,
+  }), { available: 0, total: 0 })])) as Record<DashboardGroupKey, { available: number; total: number }>, [rows]);
 
-  const running = tasks.filter((task) => ["PENDING", "STARTED", "PROGRESS", "RETRY"].includes(task.status)).length;
-  const completed = tasks.filter((task) => task.status === "SUCCESS").length;
+  return <main className="space-y-5">
+    <header className="flex flex-wrap items-end justify-between gap-4 border-b pb-4">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">CityGIS · Operationeel overzicht</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Postenoverzicht</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Actuele beschikbaarheid van voertuigen per post.</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span role="status" className={`inline-flex items-center gap-2 border px-2.5 py-1.5 text-xs ${connected ? "text-foreground" : "border-amber-400 bg-amber-50 text-amber-900"}`}>
+          {connected ? <Signal aria-hidden="true" className="h-3.5 w-3.5 text-emerald-700" /> : <SignalZero aria-hidden="true" className="h-3.5 w-3.5" />}
+          {connected ? "Live verbonden" : "Liveverbinding tijdelijk onderbroken · laatste gegevens blijven zichtbaar"}
+        </span>
+        <Button variant="outline" size="sm" onClick={() => void refresh()} disabled={loading} aria-label="Postenoverzicht vernieuwen" title="Vernieuwen">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Vernieuwen
+        </Button>
+      </div>
+    </header>
 
-  return <div className="space-y-8">
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div><p className="text-sm font-medium text-primary">Workspace overview</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Dashboard</h1><p className="mt-2 text-sm text-muted-foreground">Your application foundation is ready to extend.</p></div>
-      <Button variant="outline" onClick={() => void refresh()} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
-    </div>
+    {snapshot?.sync_state.last_error && <p role="status" className="border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">Laatste CityGIS-synchronisatie mislukt. De laatst opgeslagen gegevens blijven zichtbaar. {snapshot.sync_state.last_error}</p>}
+    {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 border-l-2 border-red-500 bg-red-50 p-3 text-sm text-red-900"><span className="inline-flex items-center gap-2"><AlertCircle aria-hidden="true" className="h-4 w-4" />{error}</span><Button variant="outline" size="sm" onClick={() => void refresh()}>Opnieuw proberen</Button></div>}
 
-    {error && <div role="alert" className="flex items-center justify-between border-l-2 border-red-500 bg-red-50 p-4 text-sm text-red-800">{error}<Button variant="outline" size="sm" onClick={() => void refresh()}>Try again</Button></div>}
+    {loading && !snapshot ? <div role="status" className="flex items-center gap-2 border bg-white px-4 py-8 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" />Posten en voertuigen laden…</div>
+      : snapshot && !hasPosts && !error ? <div className="border bg-white px-4 py-10 text-center"><p className="font-medium">Geen posten gevonden</p><p className="mt-1 text-sm text-muted-foreground">Voeg posten toe via Locatiebeheer.</p></div>
+        : snapshot && <>
+          <div className="overflow-x-auto border bg-white shadow-sm">
+            <table className="w-full min-w-[1180px] table-fixed border-collapse text-left text-sm">
+              <colgroup>
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "26%" }} />
+                <col style={{ width: "15%" }} />
+              </colgroup>
+              <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
+                <tr>
+                  <th scope="col" className="border-b px-3 py-3 align-bottom font-medium text-foreground">Post</th>
+                  {GROUPS.map(({ key, title, note }) => <th scope="col" key={key} className="border-b px-3 py-3 align-bottom font-medium">
+                    <span className="flex items-baseline justify-between gap-1 text-foreground"><span>{title}</span><span className="font-mono text-xs font-normal text-muted-foreground">{totals[key].available}/{totals[key].total}</span></span>
+                    <span className="mt-1 block text-[10px] font-normal text-muted-foreground">{note}</span>
+                  </th>)}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {rows.map((row) => <tr key={row.location.id} className="align-top hover:bg-muted/20">
+                  <th scope="row" className="px-3 py-3 text-left font-semibold">
+                    <span className="block whitespace-normal break-words">{row.location.name}</span>
+                  </th>
+                  {GROUPS.map(({ key, columns }) => <td key={key} className="px-2 py-2 align-top">
+                    <AssetCell postName={row.location.name} vectors={row.groups[key]} columns={columns} knownStatusCodes={knownStatusCodes} onStatus={setHistoryVector} />
+                  </td>)}
+                </tr>)}
+                {rows.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">Er zijn nog geen posten om weer te geven.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          {!hasCurrentVectors && <p role="status" className="border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">Er zijn nog geen actuele vectoren voor deze posten.</p>}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <p>Beschikbaar = status 0 of 6 · Status 99 staat in Rest · klik op een status voor de historiek.</p>
+            <p>Laatst vernieuwd: {formatDate(snapshot.last_refreshed_at)}</p>
+          </div>
+        </>}
 
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {[
-        { label: "Recent tasks", value: tasks.length, icon: ListTodo },
-        { label: "Currently active", value: running, icon: Activity },
-        { label: "Completed", value: completed, icon: CheckCircle2 },
-        { label: "Task runtime", value: "30 sec", icon: Clock3 },
-      ].map(({ label, value, icon: Icon }) => <Card key={label}><CardContent className="flex items-center justify-between p-5"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold">{value}</p></div><span className="grid h-10 w-10 place-items-center bg-muted"><Icon className="h-5 w-5 text-muted-foreground" /></span></CardContent></Card>)}
-    </div>
-
-    <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-      <Card>
-        <CardHeader><CardTitle>Start a background task</CardTitle><CardDescription>See the full REST → Celery → PostgreSQL → SSE flow in action.</CardDescription></CardHeader>
-        <CardContent><StartTaskForm onStart={start} busy={starting} /></CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle>Task execution</CardTitle><CardDescription>Tasks continue even when you navigate away.</CardDescription></CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <div className="flex items-start gap-3"><span className="mt-0.5 grid h-6 w-6 place-items-center bg-muted text-xs font-semibold text-foreground">1</span><p>Start the example task. Django returns its Celery task ID immediately.</p></div>
-          <div className="flex items-start gap-3"><span className="mt-0.5 grid h-6 w-6 place-items-center bg-muted text-xs font-semibold text-foreground">2</span><p>A worker reports progress, saved with the task result in PostgreSQL.</p></div>
-          <div className="flex items-start gap-3"><span className="mt-0.5 grid h-6 w-6 place-items-center bg-muted text-xs font-semibold text-foreground">3</span><p>The task page reconnects over SSE and restores the latest state after refresh.</p></div>
-        </CardContent>
-      </Card>
-    </div>
-
-    {activeTask && <Card><CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle>Saved task</CardTitle><CardDescription className="mt-1 font-mono text-xs">{activeTask.task_id}</CardDescription></div><Button variant="outline" asChild><Link to={`/tasks/${activeTask.task_id}`}>Open task <ArrowRight className="h-4 w-4" /></Link></Button></div></CardHeader><CardContent><TaskProgress task={activeTask} /></CardContent></Card>}
-
-      <Card>
-        <CardHeader><div className="flex items-center justify-between gap-3"><div><CardTitle>Recent background tasks</CardTitle><CardDescription className="mt-1">Latest task executions. Status updates automatically.</CardDescription></div><Button variant="outline" asChild><Link to="/tasks">View all <ArrowRight className="h-4 w-4" /></Link></Button></div></CardHeader>
-      <CardContent>
-        {loading ? <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" />Loading tasks…</div> : tasks.length === 0 ? <div className="py-8 text-center"><Play className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-3 text-sm font-medium">No tasks yet</p><p className="mt-1 text-sm text-muted-foreground">Start the example above to see it here.</p></div> : <div className="divide-y">{tasks.slice(0, 5).map((task) => <Link key={task.task_id} to={`/tasks/${task.task_id}`} className="flex items-center justify-between gap-4 py-4 hover:bg-muted/40"><div className="min-w-0"><p className="truncate text-sm font-medium">{taskLabel(task.task_name)}</p><p className="mt-1 truncate font-mono text-xs text-muted-foreground">{task.task_id}</p></div><span className="text-xs text-muted-foreground">{taskStatusLabel(task.status)}</span></Link>)}</div>}
-      </CardContent>
-    </Card>
-  </div>;
+    {historyVector && <CityGISStatusHistoryDialog
+      vectorId={historyVector.id}
+      vectorLabel={historyVector.abbreviation || historyVector.vector_code}
+      vehicleLabel={historyVector.vehicle?.alphacode || historyVector.source_vehicle_name}
+      onClose={() => setHistoryVector(null)}
+    />}
+  </main>;
 }
