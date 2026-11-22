@@ -115,8 +115,8 @@ export function AppLayout() {
 
       <div className="lg:pl-64">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b bg-white/95 px-4 backdrop-blur sm:px-8">
-          <button aria-label="Open menu" className="lg:hidden" onClick={() => setMenuOpen(true)}><Menu className="h-5 w-5" /></button>
-          <span className="text-sm text-muted-foreground lg:hidden">{title}</span>
+          <button aria-label="Open menu" className="lg:hidden shrink-0" onClick={() => setMenuOpen(true)}><Menu className="h-5 w-5" /></button>
+          <img className="ml-3 h-8 w-auto max-w-[calc(100vw-8rem)] shrink object-contain object-left lg:hidden" src="/logo-asset-management.svg" alt={title} />
           <div className="ml-auto"><CommandPalette /></div>
         </header>
         <main className="mx-auto max-w-7xl p-4 sm:p-8"><Outlet /></main>
