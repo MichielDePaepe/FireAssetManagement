@@ -3,7 +3,15 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from django.urls import reverse
 
-from assets.models import Issi, Organization, Radio, RadioModel, RadioSubscription, TeiRange
+from assets.models import (
+    Issi,
+    Manufacturer,
+    Organization,
+    Radio,
+    RadioModel,
+    RadioSubscription,
+    TeiRange,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -30,11 +38,10 @@ def regular_client(db):
 
 def test_staff_can_manage_radios_and_fireplan_fields_remain_read_only(staff_client):
     model = RadioModel.objects.create(
-        manufacturer="Example", name="Portable", application=Radio.Application.PORTABLE
+        manufacturer=Manufacturer.objects.get_or_create(name="Example")[0], name="Portable"
     )
     radio = Radio.objects.create(
         tei="00000000000001",
-        application=Radio.Application.PORTABLE,
         model=model,
         fireplan_id=9001,
         fireplan_qr_url="https://infoscan.firebru.brussels?data=1,1,9001,1010",
@@ -54,7 +61,7 @@ def test_staff_can_manage_radios_and_fireplan_fields_remain_read_only(staff_clie
 
 
 def test_regular_users_can_read_but_cannot_mutate_radio_records(regular_client):
-    radio = Radio.objects.create(tei="00000000000003", application=Radio.Application.FIXED)
+    radio = Radio.objects.create(tei="00000000000003")
 
     assert regular_client.get(reverse("radio-list")).status_code == 200
     assert regular_client.patch(
@@ -66,18 +73,17 @@ def test_regular_users_can_read_but_cannot_mutate_radio_records(regular_client):
 
 def test_radio_search_matches_model_fireplan_and_current_issi(staff_client):
     model = RadioModel.objects.create(
-        manufacturer="ExampleBrand", name="Model Search", application=Radio.Application.PORTABLE
+        manufacturer=Manufacturer.objects.get_or_create(name="ExampleBrand")[0], name="Model Search"
     )
     radio = Radio.objects.create(
         tei="00000000000004",
-        application=Radio.Application.PORTABLE,
         model=model,
         fireplan_id=907654,
     )
     issi = Issi.objects.create(issi="7654321", alias="Search Alias")
     RadioSubscription.assign(radio, issi)
 
-    for query in ("00000000000004", "ExampleBrand", "Model Search", "907654", "7654321"):
+    for query in ("00000000000004", "000000000000040", "ExampleBrand", "Model Search", "907654", "7654321"):
         response = staff_client.get(reverse("radio-list"), {"search": query})
         assert response.status_code == 200
         assert [item["id"] for item in response.json()] == [radio.pk]
@@ -86,7 +92,7 @@ def test_radio_search_matches_model_fireplan_and_current_issi(staff_client):
 def test_issi_search_matches_number_alias_organization_and_radio(staff_client):
     organization = Organization.objects.create(name="Organization Search")
     issi = Issi.objects.create(issi="8123456", alias="Alias Search", organization=organization)
-    radio = Radio.objects.create(tei="00000000000005", application=Radio.Application.PORTABLE)
+    radio = Radio.objects.create(tei="00000000000005")
     RadioSubscription.assign(radio, issi)
 
     for query in ("8123456", "Alias Search", "Organization Search", "00000000000005"):
@@ -97,10 +103,10 @@ def test_issi_search_matches_number_alias_organization_and_radio(staff_client):
 
 def test_subscription_api_replaces_confirmed_link_and_exposes_history(staff_client):
     first_radio = Radio.objects.create(
-        tei="00000000000006", application=Radio.Application.PORTABLE
+        tei="00000000000006"
     )
     second_radio = Radio.objects.create(
-        tei="00000000000007", application=Radio.Application.PORTABLE
+        tei="00000000000007"
     )
     first_issi = Issi.objects.create(issi="8234567", alias="First ISSI")
     second_issi = Issi.objects.create(issi="8345678", alias="Second ISSI")
@@ -128,7 +134,10 @@ def test_staff_can_manage_organizations_models_and_ranges(staff_client):
     )
     model = staff_client.post(
         reverse("radio-model-list"),
-        {"manufacturer": "Maker", "name": "Portable X", "application": "portable"},
+        {
+            "manufacturer_id": Manufacturer.objects.get_or_create(name="Maker")[0].pk,
+            "name": "Portable X",
+        },
         content_type="application/json",
     )
     assert organization.status_code == 201
@@ -144,11 +153,13 @@ def test_staff_can_manage_organizations_models_and_ranges(staff_client):
     )
     assert range_response.status_code == 201
     assert TeiRange.objects.count() == 1
+    assert TeiRange.objects.get().start_tei == "000000000001000"
+    assert TeiRange.objects.get().end_tei == "000000000001990"
 
 
 def test_api_reports_overlapping_tei_range_as_validation_error(staff_client):
     model = RadioModel.objects.create(
-        manufacturer="Maker", name="Range validation", application=Radio.Application.PORTABLE
+        manufacturer=Manufacturer.objects.get_or_create(name="Maker")[0], name="Range validation"
     )
     TeiRange.objects.create(
         model=model, start_tei="00000000000100", end_tei="00000000000199"
@@ -168,27 +179,27 @@ def test_api_reports_overlapping_tei_range_as_validation_error(staff_client):
     assert TeiRange.objects.count() == 1
 
 
-def test_radio_api_rejects_model_from_a_different_application(staff_client):
+def test_radio_api_accepts_model_without_application_classification(staff_client):
     model = RadioModel.objects.create(
-        manufacturer="Maker", name="Fixed model", application=Radio.Application.FIXED
+        manufacturer=Manufacturer.objects.get_or_create(name="Maker")[0], name="Fixed model"
     )
 
     response = staff_client.post(
         reverse("radio-list"),
         {
             "tei": "00000000000008",
-            "application": Radio.Application.PORTABLE,
             "model_id": model.pk,
         },
         content_type="application/json",
     )
 
-    assert response.status_code == 400
-    assert Radio.objects.count() == 0
+    assert response.status_code == 201
+    assert Radio.objects.get().model == model
+    assert Radio.objects.get().tei == "000000000000080"
 
 
 def test_issi_details_include_current_subscription_and_history(staff_client):
-    radio = Radio.objects.create(tei="00000000000009", application=Radio.Application.PORTABLE)
+    radio = Radio.objects.create(tei="00000000000009")
     issi = Issi.objects.create(issi="8456789", alias="History detail")
     RadioSubscription.assign(radio, issi)
 

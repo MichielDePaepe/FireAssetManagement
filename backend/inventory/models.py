@@ -96,30 +96,23 @@ class ManagedRelationship(models.Model):
         if (self.target_id is None) == (self.target_location_id is None):
             raise ValidationError("Geef precies één relatiebestemming op.")
         if self.source_id and self.source.kind == ManagedObject.Kind.RADIO:
-            from assets.models import Radio
             from citygis.models import Vector, Vehicle
 
-            radio = Radio.objects.filter(managed_object_id=self.source_id).first()
             valid = False
-            if radio and self.kind == self.Kind.ASSIGNED_TO:
+            if self.kind == self.Kind.ASSIGNED_TO:
                 valid = (
-                    radio.application == Radio.Application.PORTABLE
-                    and self.target_id is not None
+                    self.target_id is not None
                     and Vector.objects.filter(managed_object_id=self.target_id).exists()
                 )
-            elif radio and self.kind == self.Kind.MOUNTED_IN:
+            elif self.kind == self.Kind.MOUNTED_IN:
                 valid = (
-                    radio.application == Radio.Application.VEHICLE
-                    and self.target_id is not None
+                    self.target_id is not None
                     and Vehicle.objects.filter(managed_object_id=self.target_id).exists()
                 )
-            elif radio and self.kind == self.Kind.INSTALLED_IN:
-                valid = (
-                    radio.application == Radio.Application.FIXED
-                    and self.target_location_id is not None
-                )
+            elif self.kind == self.Kind.INSTALLED_IN:
+                valid = self.target_location_id is not None
             if not valid:
-                raise ValidationError("Deze relatiebestemming past niet bij de radio-toepassing.")
+                raise ValidationError("De bestemming past niet bij het relatietype.")
 
     @classmethod
     def assign_operationally(cls, source: ManagedObject, target: ManagedObject):
@@ -168,6 +161,11 @@ class ManagedRelationship(models.Model):
             ):
                 return current
             now = timezone.now()
+            if locked_source.kind == ManagedObject.Kind.RADIO:
+                active_relations = cls.objects.filter(source=locked_source, ended_at__isnull=True)
+                if current:
+                    active_relations = active_relations.exclude(pk=current.pk)
+                active_relations.update(ended_at=now)
             if current:
                 current.ended_at = now
                 current.save(update_fields=["ended_at"])

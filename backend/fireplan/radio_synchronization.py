@@ -4,13 +4,10 @@ from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import IntegrityError, transaction
 
-from assets.models import Radio, RadioModel
+from assets.models import Radio, RadioModel, normalize_tei, tei_validator
 from inventory.models import ManagedObject
 
-RADIO_APPLICATIONS = {
-    "Radio mobile Astrid": Radio.Application.VEHICLE,
-    "Radio portable Astrid": Radio.Application.PORTABLE,
-}
+RADIO_NAMES = {"Radio mobile Astrid", "Radio portable Astrid"}
 
 
 def _error_summary(record: object, message: str) -> dict[str, object]:
@@ -23,8 +20,7 @@ def _error_summary(record: object, message: str) -> dict[str, object]:
 
 def _validated_source_fields(record: dict):
     name = record.get("name")
-    application = RADIO_APPLICATIONS.get(name) if isinstance(name, str) else None
-    if application is None:
+    if not isinstance(name, str) or name not in RADIO_NAMES:
         return None
 
     fireplan_id = record.get("id")
@@ -34,6 +30,11 @@ def _validated_source_fields(record: dict):
     tei = record.get("serialNumber")
     if not isinstance(tei, str) or not tei or tei.strip() != tei:
         raise ValidationError("TEI ontbreekt of is geen geldige tekstwaarde.")
+    tei = normalize_tei(tei)
+    try:
+        tei_validator(tei)
+    except ValidationError as error:
+        raise ValidationError("TEI moet na normalisatie precies 15 cijfers bevatten.") from error
 
     qr_url = record.get("qrCode")
     if not isinstance(qr_url, str) or not qr_url or qr_url.strip() != qr_url:
@@ -44,7 +45,7 @@ def _validated_source_fields(record: dict):
         raise ValidationError("QR-URL is ongeldig.") from error
     if len(qr_url) > 500:
         raise ValidationError("QR-URL is langer dan 500 tekens.")
-    return fireplan_id, tei, qr_url, application
+    return fireplan_id, tei, qr_url
 
 
 def synchronize_fireplan_radios(
@@ -76,7 +77,7 @@ def synchronize_fireplan_radios(
                 summary["skipped"] = int(summary["skipped"]) + 1
                 continue
 
-            fireplan_id, tei, qr_url, application = fields
+            fireplan_id, tei, qr_url = fields
             try:
                 with transaction.atomic():
                     radio = (
@@ -92,10 +93,9 @@ def synchronize_fireplan_radios(
                         )
                         continue
 
-                    model = RadioModel.for_tei(tei, application)
+                    model = RadioModel.for_tei(tei)
                     values = {
                         "tei": tei,
-                        "application": application,
                         "model": model,
                         "fireplan_id": fireplan_id,
                         "fireplan_qr_url": qr_url,

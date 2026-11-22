@@ -71,3 +71,5 @@ services:
 
 volumes:
   frontend_node_modules:
+    external: true
+    name: fire-asset-management_frontend_node_modules

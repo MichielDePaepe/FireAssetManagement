@@ -4,6 +4,7 @@ from inventory.serializers import ManagedObjectIdentitySerializer
 
 from .models import (
     Issi,
+    Manufacturer,
     Organization,
     Pager,
     PagerType,
@@ -12,7 +13,23 @@ from .models import (
     RadioSubscription,
     RicCode,
     TeiRange,
+    _tei_numeric_value,
 )
+
+
+class ManufacturerNameField(serializers.Field):
+    """Expose manufacturer names while storing normalized FK records."""
+
+    default_error_messages = {"invalid": "Geef een geldige fabrikantnaam op."}
+
+    def to_representation(self, value):
+        return value.name
+
+    def to_internal_value(self, data):
+        if not isinstance(data, str) or not data.strip() or len(data.strip()) > 100:
+            self.fail("invalid")
+        manufacturer, _ = Manufacturer.objects.get_or_create(name=data.strip())
+        return manufacturer
 
 
 class PagerTypeSerializer(serializers.ModelSerializer):
@@ -22,9 +39,12 @@ class PagerTypeSerializer(serializers.ModelSerializer):
 
 
 class RadioModelSerializer(serializers.ModelSerializer):
+    manufacturer = ManufacturerNameField()
+    manufacturer_id = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = RadioModel
-        fields = ["id", "manufacturer", "name", "application"]
+        fields = ["id", "manufacturer", "manufacturer_id", "name"]
         read_only_fields = fields
 
 
@@ -40,7 +60,6 @@ class RadioSerializer(serializers.ModelSerializer):
             "tei",
             "manufacturer",
             "model_name",
-            "application",
             "model",
             "fireplan_id",
             "fireplan_qr_url",
@@ -53,6 +72,13 @@ class RadioSerializer(serializers.ModelSerializer):
 class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization
+        fields = ["id", "name"]
+        read_only_fields = ["id"]
+
+
+class ManufacturerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Manufacturer
         fields = ["id", "name"]
         read_only_fields = ["id"]
 
@@ -71,10 +97,15 @@ class IssiSerializer(serializers.ModelSerializer):
 
 
 class RadioModelManagementSerializer(serializers.ModelSerializer):
+    manufacturer = serializers.CharField(source="manufacturer.name", read_only=True)
+    manufacturer_id = serializers.PrimaryKeyRelatedField(
+        source="manufacturer", queryset=Manufacturer.objects.all()
+    )
+
     class Meta:
         model = RadioModel
-        fields = ["id", "manufacturer", "name", "application"]
-        read_only_fields = ["id"]
+        fields = ["id", "manufacturer", "manufacturer_id", "name"]
+        read_only_fields = ["id", "manufacturer"]
 
 
 class TeiRangeSerializer(serializers.ModelSerializer):
@@ -93,8 +124,8 @@ class TeiRangeSerializer(serializers.ModelSerializer):
         start = attrs.get("start_tei", getattr(self.instance, "start_tei", None))
         end = attrs.get("end_tei", getattr(self.instance, "end_tei", None))
         if model and start and end:
-            start_value = int(start, 16)
-            end_value = int(end, 16)
+            start_value = _tei_numeric_value(start)
+            end_value = _tei_numeric_value(end)
             if start_value > end_value:
                 raise serializers.ValidationError(
                     {"end_tei": "Het eind van het TEI-bereik moet na het begin liggen."}
@@ -103,7 +134,8 @@ class TeiRangeSerializer(serializers.ModelSerializer):
             if self.instance:
                 ranges = ranges.exclude(pk=self.instance.pk)
             if any(
-                int(row.start_tei, 16) <= end_value and int(row.end_tei, 16) >= start_value
+                _tei_numeric_value(row.start_tei) <= end_value
+                and _tei_numeric_value(row.end_tei) >= start_value
                 for row in ranges
             ):
                 raise serializers.ValidationError(
@@ -147,7 +179,7 @@ class RadioManagementSerializer(serializers.ModelSerializer):
     class Meta:
         model = Radio
         fields = [
-            "id", "managed_object", "tei", "manufacturer", "model_name", "application",
+            "id", "managed_object", "tei", "manufacturer", "model_name",
             "model", "model_id", "fireplan_id", "fireplan_qr_url", "created_at", "updated_at",
             "current_subscription", "subscription_history",
         ]
@@ -155,15 +187,6 @@ class RadioManagementSerializer(serializers.ModelSerializer):
             "id", "fireplan_id", "fireplan_qr_url", "created_at", "updated_at",
             "current_subscription", "subscription_history",
         ]
-
-    def validate(self, attrs):
-        model = attrs.get("model", getattr(self.instance, "model", None))
-        application = attrs.get("application", getattr(self.instance, "application", None))
-        if model and application and model.application != application:
-            raise serializers.ValidationError(
-                {"model_id": "Dit model past niet bij de toepassing."}
-            )
-        return attrs
 
     def get_current_subscription(self, instance):
         subscription = (

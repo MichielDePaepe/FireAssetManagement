@@ -1,6 +1,6 @@
 import pytest
 
-from assets.models import Radio, RadioModel, TeiRange
+from assets.models import Manufacturer, Radio, RadioModel, TeiRange
 from fireplan.radio_synchronization import synchronize_fireplan_radios
 
 pytestmark = pytest.mark.django_db
@@ -18,7 +18,6 @@ def fireplan_radio(fireplan_id=3001, name="Radio portable Astrid", tei="00000000
 def test_import_matches_by_fireplan_id_and_updates_source_fields():
     radio = Radio.objects.create(
         tei="00000000000002",
-        application=Radio.Application.PORTABLE,
         fireplan_id=3001,
         fireplan_qr_url="https://infoscan.firebru.brussels?data=1,1,3001,1010",
     )
@@ -27,15 +26,33 @@ def test_import_matches_by_fireplan_id_and_updates_source_fields():
 
     radio.refresh_from_db()
     assert (result["added"], result["updated"], result["unchanged"]) == (0, 1, 0)
-    assert radio.tei == "00000000000003"
+    assert radio.tei == "000000000000030"
     assert radio.fireplan_id == 3001
-    assert radio.application == Radio.Application.PORTABLE
     assert radio.fireplan_qr_url.endswith("3001,1010")
+
+
+@pytest.mark.parametrize(
+    ("source_tei", "stored_tei"),
+    [
+        ("01234567890123", "012345678901230"),
+        ("012345678901234", "012345678901234"),
+    ],
+)
+def test_import_normalizes_fourteen_digits_and_preserves_fifteen(
+    source_tei, stored_tei
+):
+    result = synchronize_fireplan_radios(
+        [fireplan_radio(fireplan_id=3010, tei=source_tei)]
+    )
+
+    radio = Radio.objects.get(fireplan_id=3010)
+    assert result["added"] == 1
+    assert radio.tei == stored_tei
 
 
 def test_import_assigns_configured_model_and_repeat_is_idempotent():
     model = RadioModel.objects.create(
-        manufacturer="Example", name="Portable", application=Radio.Application.PORTABLE
+        manufacturer=Manufacturer.objects.get_or_create(name="Example")[0], name="Portable"
     )
     TeiRange.objects.create(model=model, start_tei="00000000000001", end_tei="00000000000010")
     record = fireplan_radio()
@@ -47,21 +64,21 @@ def test_import_assigns_configured_model_and_repeat_is_idempotent():
     radio.refresh_from_db()
 
     assert first["added"] == 1
-    assert radio.tei == record["serialNumber"]
+    assert radio.tei == f"{record['serialNumber']}0"
     assert radio.model == model
     assert second["unchanged"] == 1
     assert radio.updated_at == original_updated_at
 
 
-def test_import_maps_confirmed_source_names_and_keeps_local_only_radio():
-    local = Radio.objects.create(tei="00000000000004", application=Radio.Application.FIXED)
+def test_imports_confirmed_source_names_without_classification_and_keeps_local_radio():
+    local = Radio.objects.create(tei="00000000000004")
 
     result = synchronize_fireplan_radios(
         [fireplan_radio(name="Radio mobile Astrid", fireplan_id=3002, tei="00000000000005")]
     )
 
     imported = Radio.objects.get(fireplan_id=3002)
-    assert imported.application == Radio.Application.VEHICLE
+    assert imported.tei == "000000000000050"
     assert Radio.objects.filter(pk=local.pk).exists()
     assert result["added"] == 1
 
@@ -82,7 +99,7 @@ def test_import_reports_invalid_records_and_unsupported_names_without_serial_val
 
 def test_import_reports_tei_conflict_without_overwriting_another_fireplan_radio():
     existing = Radio.objects.create(
-        tei="00000000000006", application=Radio.Application.PORTABLE, fireplan_id=3005
+        tei="00000000000006", fireplan_id=3005
     )
 
     result = synchronize_fireplan_radios(

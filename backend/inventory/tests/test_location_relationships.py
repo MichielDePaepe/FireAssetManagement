@@ -10,11 +10,9 @@ pytestmark = pytest.mark.django_db
 
 
 def test_radio_can_be_assigned_mounted_or_installed_with_distinct_targets():
-    portable = Radio.objects.create(tei="000000000000101", application=Radio.Application.PORTABLE)
-    mounted_radio = Radio.objects.create(
-        tei="000000000000105", application=Radio.Application.VEHICLE
-    )
-    fixed_radio = Radio.objects.create(tei="000000000000106", application=Radio.Application.FIXED)
+    portable = Radio.objects.create(tei="000000000000101")
+    mounted_radio = Radio.objects.create(tei="000000000000105")
+    fixed_radio = Radio.objects.create(tei="000000000000106")
     vector = Vector.objects.create(vector_code="RADIO-ASSIGN")
     vehicle = Vehicle.objects.create(fireplan_id=99101, alphacode="RADIO-VEHICLE")
     post = Location.objects.create(name="Radio post", kind=Location.Kind.POST)
@@ -39,7 +37,7 @@ def test_radio_can_be_assigned_mounted_or_installed_with_distinct_targets():
 
 
 def test_relationship_requires_exactly_one_target():
-    radio = Radio.objects.create(tei="000000000000102", application=Radio.Application.FIXED)
+    radio = Radio.objects.create(tei="000000000000102")
     post = Location.objects.create(name="Radio location")
     relation = ManagedRelationship(
         source=radio.managed_object,
@@ -75,7 +73,7 @@ def test_relationship_requires_exactly_one_target():
 
 
 def test_radio_relationship_kinds_reject_incompatible_destinations():
-    radio = Radio.objects.create(tei="000000000000103", application=Radio.Application.PORTABLE)
+    radio = Radio.objects.create(tei="000000000000103")
     vehicle = Vehicle.objects.create(fireplan_id=99103, alphacode="RADIO-INVALID")
     relation = ManagedRelationship(
         source=radio.managed_object,
@@ -88,7 +86,7 @@ def test_radio_relationship_kinds_reject_incompatible_destinations():
 
 
 def test_radio_relationship_replacement_keeps_previous_history():
-    radio = Radio.objects.create(tei="000000000000104", application=Radio.Application.FIXED)
+    radio = Radio.objects.create(tei="000000000000104")
     first = Location.objects.create(name="First installation")
     second = Location.objects.create(name="Second installation")
     old = ManagedRelationship.relate(

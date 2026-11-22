@@ -271,16 +271,22 @@ export interface RadioAsset {
   tei: string;
   manufacturer: string;
   model_name: string;
-  application: "portable" | "vehicle" | "fixed";
-  model: { id: number; manufacturer: string; name: string; application: string } | null;
+  model: { id: number; manufacturer: string; name: string } | null;
   model_id?: number | null;
   fireplan_id: number | null;
   fireplan_qr_url?: string | null;
+  created_at: string;
+  updated_at: string;
   current_subscription?: RadioSubscription | null;
   subscription_history?: RadioSubscription[];
 }
 
 export interface Organization {
+  id: number;
+  name: string;
+}
+
+export interface Manufacturer {
   id: number;
   name: string;
 }
@@ -298,8 +304,8 @@ export interface IssiAsset {
 export interface RadioModel {
   id: number;
   manufacturer: string;
+  manufacturer_id: number;
   name: string;
-  application: RadioAsset["application"];
 }
 
 export interface TeiRange {
@@ -315,6 +321,16 @@ export interface RadioSubscription {
   issi: { id: number; issi: string; alias: string };
   started_at: string;
   ended_at: string | null;
+}
+
+export interface RadioSubscriptionImportResult {
+  rows: number;
+  subscriptions: number;
+  created_radios: number;
+  created_issis: number;
+  ended_subscriptions: number;
+  skipped: number;
+  issues: string[];
 }
 
 export interface RadioRelationshipEntry {
@@ -405,7 +421,9 @@ function csrfCookie(): string | undefined {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
-  if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
   const token = csrfCookie();
   if (token && !["GET", "HEAD", "OPTIONS"].includes(options.method ?? "GET")) {
     headers.set("X-CSRFToken", decodeURIComponent(token));
@@ -461,6 +479,7 @@ export const api = {
     }),
   listRadios: (search = "") =>
     request<RadioAsset[]>(`/radios/${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+  getRadio: (id: number) => request<RadioAsset>(`/radios/${id}/`),
   getRadioRelationship: (id: number) =>
     request<RadioRelationshipSnapshot>(`/inventory/radios/${id}/relationship/`),
   updateRadioRelationship: (id: number, values: {
@@ -472,7 +491,6 @@ export const api = {
   }),
   createRadio: (values: {
     tei: string;
-    application: RadioAsset["application"];
     manufacturer: string;
     model_name: string;
     model_id?: number | null;
@@ -493,10 +511,15 @@ export const api = {
   updateOrganization: (id: number, values: { name: string }) =>
     request<Organization>(`/organizations/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
   deleteOrganization: (id: number) => request<void>(`/organizations/${id}/`, { method: "DELETE" }),
+  listManufacturers: () => request<Manufacturer[]>("/manufacturers/"),
+  createManufacturer: (values: { name: string }) =>
+    request<Manufacturer>("/manufacturers/", { method: "POST", body: JSON.stringify(values) }),
+  updateManufacturer: (id: number, values: { name: string }) =>
+    request<Manufacturer>(`/manufacturers/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
   listRadioModels: () => request<RadioModel[]>("/radio-models/"),
-  createRadioModel: (values: Omit<RadioModel, "id">) =>
+  createRadioModel: (values: { manufacturer_id: number; name: string }) =>
     request<RadioModel>("/radio-models/", { method: "POST", body: JSON.stringify(values) }),
-  updateRadioModel: (id: number, values: Omit<RadioModel, "id">) =>
+  updateRadioModel: (id: number, values: { manufacturer_id: number; name: string }) =>
     request<RadioModel>(`/radio-models/${id}/`, { method: "PATCH", body: JSON.stringify(values) }),
   deleteRadioModel: (id: number) => request<void>(`/radio-models/${id}/`, { method: "DELETE" }),
   listTeiRanges: () => request<TeiRange[]>("/tei-ranges/"),
@@ -511,6 +534,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ radio_id, issi_id }),
     }),
+  importRadioSubscriptions: (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<RadioSubscriptionImportResult>("/radio-subscriptions/import/", {
+      method: "POST",
+      body,
+    });
+  },
   getFireplanInventories: (page = 1, pageSize = 25) =>
     request<FireplanInventoryPage>(
       `/fireplan/inventories/?page=${page}&page_size=${pageSize}`,

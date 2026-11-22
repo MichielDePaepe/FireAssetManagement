@@ -1,9 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type CityGISSnapshot, type RadioModel } from "@/lib/api";
 import { RadioManagementPage } from "@/pages/RadioManagementPage";
+import { RadioDetailPage } from "@/pages/RadioDetailPage";
 
 const authState = vi.hoisted(() => ({ isStaff: true }));
 const mockedNavigate = vi.hoisted(() => vi.fn());
@@ -12,12 +13,12 @@ vi.mock("react-router-dom", async (importOriginal) => ({
   ...await importOriginal<typeof import("react-router-dom")>(),
   useNavigate: () => mockedNavigate,
 }));
-vi.mock("@/components/RadioScanLookup", () => ({
-  RadioScanLookup: ({ onRadioIdentified }: { onRadioIdentified: (radio: typeof sampleRadio) => void }) => <button type="button" onClick={() => onRadioIdentified(sampleRadio)}>Simuleer radio scan</button>,
+vi.mock("@/components/PagerScanControl", () => ({
+  PagerScanControl: ({ onScan, subject }: { onScan: (scan: string) => void; subject?: string }) => <button type="button" onClick={() => onScan("sample scan")}>Simuleer {subject} scan</button>,
 }));
 vi.mock("@/lib/api", () => ({
   api: {
-    listRadios: vi.fn(), createRadio: vi.fn(), updateRadio: vi.fn(), deleteRadio: vi.fn(),
+    listRadios: vi.fn(), getRadio: vi.fn(), createRadio: vi.fn(), updateRadio: vi.fn(), deleteRadio: vi.fn(),
     listIssis: vi.fn(), createIssi: vi.fn(), updateIssi: vi.fn(), deleteIssi: vi.fn(),
     listOrganizations: vi.fn(), createOrganization: vi.fn(),
     listRadioModels: vi.fn(), createRadioModel: vi.fn(), listTeiRanges: vi.fn(), createTeiRange: vi.fn(),
@@ -32,9 +33,10 @@ const sampleRadio = {
   tei: "00000000000001",
   manufacturer: "Example",
   model_name: "Portable X",
-  application: "portable" as const,
-  model: { id: 2, manufacturer: "Example", name: "Portable X", application: "portable" as const } satisfies RadioModel,
+  model: { id: 2, manufacturer: "Example", manufacturer_id: 1, name: "Portable X" } satisfies RadioModel,
   fireplan_id: 4321,
+  created_at: "2026-11-20T10:00:00Z",
+  updated_at: "2026-11-20T10:00:00Z",
   current_subscription: {
     id: 9,
     radio: { id: 7, tei: "00000000000001" },
@@ -68,7 +70,10 @@ const sampleCityGIS = {
 } satisfies CityGISSnapshot;
 
 function renderPage() {
-  return render(<MemoryRouter><RadioManagementPage /></MemoryRouter>);
+  return render(<MemoryRouter initialEntries={["/radios"]}><Routes>
+    <Route path="/radios" element={<RadioManagementPage />} />
+    <Route path="/radios/:radioId" element={<RadioDetailPage />} />
+  </Routes></MemoryRouter>);
 }
 
 describe("RadioManagementPage", () => {
@@ -76,6 +81,7 @@ describe("RadioManagementPage", () => {
     vi.clearAllMocks();
     authState.isStaff = true;
     vi.mocked(api.listRadios).mockResolvedValue([sampleRadio]);
+    vi.mocked(api.getRadio).mockResolvedValue(sampleRadio);
     vi.mocked(api.listIssis).mockResolvedValue([sampleIssi]);
     vi.mocked(api.listOrganizations).mockResolvedValue([{ id: 3, name: "Brandweer Brussel" }]);
     vi.mocked(api.listRadioModels).mockResolvedValue([sampleRadio.model]);
@@ -92,7 +98,7 @@ describe("RadioManagementPage", () => {
 
     expect(await screen.findByText("00000000000001")).toBeInTheDocument();
     expect(screen.getByText("4321")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Radio's" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Toestellen" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "ISSI's" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Abonnementen" })).toBeInTheDocument();
     expect(screen.queryByLabelText("FirePlan-ID")).not.toBeInTheDocument();
@@ -116,19 +122,17 @@ describe("RadioManagementPage", () => {
     expect(screen.getByText("Geen radio's gevonden.")).toBeInTheDocument();
   });
 
-  it("creates a radio with a text TEI and selected application", async () => {
+  it("creates a radio with a text TEI", async () => {
     const user = userEvent.setup();
     vi.mocked(api.createRadio).mockResolvedValue(sampleRadio);
     renderPage();
     await screen.findByText("00000000000001");
     await user.click(screen.getByRole("button", { name: "Radio toevoegen" }));
     await user.type(screen.getByLabelText("TEI"), "00000000000002");
-    await user.selectOptions(screen.getByLabelText("Radio toepassing"), "portable");
     await user.click(screen.getByRole("button", { name: "Radio opslaan" }));
 
     await waitFor(() => expect(api.createRadio).toHaveBeenCalledWith(expect.objectContaining({
       tei: "00000000000002",
-      application: "portable",
     })));
   });
 
@@ -154,16 +158,17 @@ describe("RadioManagementPage", () => {
     expect(screen.getAllByText("Beëindigd").length).toBeGreaterThan(0);
   });
 
-  it("selects a radio after scanner identification without changing its subscription", async () => {
+  it("opens the radio detail page after scanner identification", async () => {
     const user = userEvent.setup();
+    vi.mocked(api.lookupRadioScan).mockResolvedValue({ raw_scan: "sample scan", radio: sampleRadio });
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "Simuleer radio scan" }));
-    expect(await screen.findByRole("region", { name: "Radio plaatsing" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Simuleer Radio scan" }));
+    expect(await screen.findByRole("heading", { name: "Radio 00000000000001" })).toBeInTheDocument();
     expect(api.assignRadioSubscription).not.toHaveBeenCalled();
     expect(api.updateRadioRelationship).not.toHaveBeenCalled();
   });
 
-  it("saves an application-appropriate vector placement and shows its history", async () => {
+  it("saves a directly selected vector placement and shows its history", async () => {
     const user = userEvent.setup();
     vi.mocked(api.updateRadioRelationship).mockResolvedValue({
       current: { id: 20, kind: "assigned_to", target: { id: 600, kind: "vector" }, location: null, started_at: "2026-11-21T10:00:00Z", ended_at: null },
@@ -171,8 +176,8 @@ describe("RadioManagementPage", () => {
     });
     renderPage();
     await screen.findByText("00000000000001");
-    await user.click(screen.getByRole("button", { name: "Details radio 00000000000001" }));
-    await user.selectOptions(await screen.findByLabelText("Vector"), "object:600");
+    await user.click(screen.getByRole("link", { name: "Details radio 00000000000001" }));
+    await user.selectOptions(await screen.findByLabelText("Bestemming"), "assigned_to:object:600");
     await user.click(screen.getByRole("button", { name: "Plaatsing bewaren" }));
     await waitFor(() => expect(api.updateRadioRelationship).toHaveBeenCalledWith(7, {
       kind: "assigned_to", target_object_id: 600, location_id: null,
@@ -186,8 +191,8 @@ describe("RadioManagementPage", () => {
     vi.mocked(api.updateRadioRelationship).mockRejectedValue(new Error("Kies een geldige vector."));
     renderPage();
     await screen.findByText("00000000000001");
-    await user.click(screen.getByRole("button", { name: "Details radio 00000000000001" }));
-    await user.selectOptions(await screen.findByLabelText("Vector"), "object:600");
+    await user.click(screen.getByRole("link", { name: "Details radio 00000000000001" }));
+    await user.selectOptions(await screen.findByLabelText("Bestemming"), "assigned_to:object:600");
     await user.click(screen.getByRole("button", { name: "Plaatsing bewaren" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Kies een geldige vector.");
   });

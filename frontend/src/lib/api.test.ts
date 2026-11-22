@@ -94,7 +94,6 @@ describe("Fireplan sync API", () => {
         tei: "00000000000001",
         manufacturer: "",
         model_name: "",
-        application: "portable",
         model: null,
         fireplan_id: 4321,
       },
@@ -120,7 +119,6 @@ describe("radio management API", () => {
       tei: "00000000000001",
       manufacturer: "",
       model_name: "",
-      application: "portable",
       model: null,
       fireplan_id: 4321,
     };
@@ -132,7 +130,6 @@ describe("radio management API", () => {
     await expect(api.listRadios("4321")).resolves.toEqual([radio]);
     await expect(api.createRadio({
       tei: "00000000000001",
-      application: "portable",
       manufacturer: "",
       model_name: "",
     })).resolves.toEqual(radio);
@@ -157,7 +154,7 @@ describe("radio management API", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await api.updateOrganization(3, { name: "Updated organization" });
-    await api.updateRadioModel(4, { manufacturer: "Maker", name: "Updated", application: "fixed" });
+    await api.updateRadioModel(4, { manufacturer_id: 7, name: "Updated" });
     await api.updateTeiRange(5, { model_id: 4, start_tei: "00000000000100", end_tei: "00000000000199" });
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([

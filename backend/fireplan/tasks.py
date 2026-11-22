@@ -13,7 +13,7 @@ from .crypto import decrypt_secret, encrypt_secret
 from .inventory_client import FireplanInventoryClient
 from .inventory_synchronization import synchronize_fireplan_inventories
 from .models import FireplanCredential
-from .radio_synchronization import RADIO_APPLICATIONS, synchronize_fireplan_radios
+from .radio_synchronization import RADIO_NAMES, synchronize_fireplan_radios
 from .synchronization import synchronize_fireplan_pagers
 
 logger = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ def synchronize_radios(self) -> dict[str, object]:
         credential.login,
         password,
         cookie_data,
-        list(RADIO_APPLICATIONS),
+        sorted(RADIO_NAMES),
     )
     credential.encrypted_cookies = encrypt_secret(refreshed_cookie_data)
     credential.session_checked_at = timezone.now()

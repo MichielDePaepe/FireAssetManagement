@@ -20,9 +20,10 @@ describe("RadioScanLookup", () => {
         tei: "00000000000001",
         manufacturer: "",
         model_name: "",
-        application: "portable",
         model: null,
         fireplan_id: 4321,
+        created_at: "2026-11-20T10:00:00Z",
+        updated_at: "2026-11-20T10:00:00Z",
       },
     });
     render(<RadioScanLookup />);

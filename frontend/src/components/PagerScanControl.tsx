@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 
 interface PagerScanControlProps {
   onScan: (rawScan: string) => Promise<void> | void;
+  subject?: string;
 }
 
-export function PagerScanControl({ onScan }: PagerScanControlProps) {
+export function PagerScanControl({ onScan, subject = "Pager" }: PagerScanControlProps) {
   const [keyboardMode, setKeyboardMode] = useState(false);
   const [cameraMode, setCameraMode] = useState(false);
   const [pending, setPending] = useState(false);
@@ -210,7 +211,7 @@ export function PagerScanControl({ onScan }: PagerScanControlProps) {
         >
           <section role="dialog" aria-modal="true" aria-labelledby="pager-camera-title" className="w-full max-w-[min(90vw,26rem)] border bg-background p-3 shadow-xl">
             <header className="mb-2 flex items-center justify-between gap-3">
-              <h2 id="pager-camera-title" className="text-sm font-medium">Pager scannen</h2>
+              <h2 id="pager-camera-title" className="text-sm font-medium">{subject} scannen</h2>
               <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="Camera stoppen" title="Scannervenster sluiten" autoFocus onClick={stopCamera}>
                 <X className="h-4 w-4" />
               </Button>

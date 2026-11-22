@@ -7,7 +7,7 @@ pytestmark = pytest.mark.django_db
 
 
 def make_radio(tei: str) -> Radio:
-    return Radio.objects.create(tei=tei, application=Radio.Application.PORTABLE)
+    return Radio.objects.create(tei=tei)
 
 
 def test_issi_and_radio_can_exist_independently():

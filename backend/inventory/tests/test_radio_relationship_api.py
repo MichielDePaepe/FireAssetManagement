@@ -41,7 +41,7 @@ def put_relationship(client, radio, data):
 
 
 def test_portable_radio_relationship_replacement_keeps_history(staff_client):
-    radio = Radio.objects.create(tei="00000000000101", application=Radio.Application.PORTABLE)
+    radio = Radio.objects.create(tei="00000000000101")
     first = Vector.objects.create(vector_code="RADIO-PLACE-A")
     second = Vector.objects.create(vector_code="RADIO-PLACE-B")
 
@@ -83,19 +83,16 @@ def test_portable_radio_relationship_replacement_keeps_history(staff_client):
 
 
 @pytest.mark.parametrize(
-    ("application", "target_kind", "relationship_kind"),
+    ("target_kind", "relationship_kind"),
     [
-        (Radio.Application.VEHICLE, "vehicle", "mounted_in"),
-        (Radio.Application.FIXED, "location", "installed_in"),
+        ("vehicle", "mounted_in"),
+        ("location", "installed_in"),
     ],
 )
 def test_vehicle_and_fixed_radios_use_typed_targets(
-    staff_client, application, target_kind, relationship_kind
+    staff_client, target_kind, relationship_kind
 ):
-    radio = Radio.objects.create(
-        tei=f"0000000000010{1 if application == Radio.Application.VEHICLE else 2}",
-        application=application,
-    )
+    radio = Radio.objects.create(tei=f"0000000000010{1 if target_kind == 'vehicle' else 2}")
     vehicle = Vehicle.objects.create(fireplan_id=88101, alphacode="RADIO-MOUNT")
     location = Location.objects.create(name="Radio installation", kind=Location.Kind.ROOM)
     target = vehicle.managed_object_id if target_kind == "vehicle" else None
@@ -117,7 +114,7 @@ def test_vehicle_and_fixed_radios_use_typed_targets(
 
 
 def test_incompatible_target_is_rejected_and_physical_observation_is_unchanged(staff_client):
-    radio = Radio.objects.create(tei="00000000000103", application=Radio.Application.FIXED)
+    radio = Radio.objects.create(tei="00000000000103")
     vector = Vector.objects.create(vector_code="RADIO-INVALID-TARGET")
     location = Location.objects.create(name="Observed radio location")
     observation = PhysicalLocationObservation.objects.create(
@@ -140,7 +137,7 @@ def test_incompatible_target_is_rejected_and_physical_observation_is_unchanged(s
 
 
 def test_radio_relationship_can_be_cleared_without_adding_an_empty_history_row(staff_client):
-    radio = Radio.objects.create(tei="00000000000104", application=Radio.Application.FIXED)
+    radio = Radio.objects.create(tei="00000000000104")
     location = Location.objects.create(name="Clearable location")
     put_relationship(
         staff_client,
@@ -161,7 +158,7 @@ def test_radio_relationship_can_be_cleared_without_adding_an_empty_history_row(s
 
 
 def test_only_staff_can_change_radio_placement(regular_client):
-    radio = Radio.objects.create(tei="00000000000105", application=Radio.Application.PORTABLE)
+    radio = Radio.objects.create(tei="00000000000105")
 
     response = put_relationship(
         regular_client,

@@ -1,32 +1,25 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowDownUp, ArrowUp, Filter, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { RadioScanLookup } from "@/components/RadioScanLookup";
+import { PagerScanControl } from "@/components/PagerScanControl";
+import { CloudRefreshIcon } from "@/components/CloudRefreshIcon";
+import { ModalDialog } from "@/components/ModalDialog";
+import { TableFilterPopover } from "@/components/TableFilterPopover";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { api, type CityGISLocation, type CityGISSnapshot, type IssiAsset, type Organization, type RadioAsset, type RadioModel, type RadioRelationshipSnapshot, type RadioSubscription, type TeiRange } from "@/lib/api";
+import { api, type IssiAsset, type Organization, type RadioAsset, type RadioModel, type RadioSubscription, type RadioSubscriptionImportResult } from "@/lib/api";
 
 type RadioTab = "radios" | "issis" | "subscriptions";
-type Application = RadioAsset["application"];
 type SortDirection = "ascending" | "descending";
-type RadioColumn = "tei" | "application" | "model" | "fireplan_id" | "issi";
+type RadioColumn = "tei" | "model" | "fireplan_id" | "issi";
 type IssiColumn = "issi" | "alias" | "organization" | "radio";
-
-const applicationLabels: Record<Application, string> = {
-  portable: "Draagbaar",
-  vehicle: "Voertuiggebonden",
-  fixed: "Vast",
-};
+type SubscriptionColumn = "radio" | "issi" | "type" | "dates";
 
 function compareText(left: string, right: string): number {
   return left.localeCompare(right, "nl-BE", { numeric: true, sensitivity: "base" });
-}
-
-function subscriptionStatus(item: RadioSubscription): string {
-  return item.ended_at ? "Beëindigd" : "Actief";
 }
 
 function formatDate(value: string | null): string {
@@ -34,22 +27,46 @@ function formatDate(value: string | null): string {
   return new Intl.DateTimeFormat("nl-BE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-function relationshipLabel(
-  entry: NonNullable<RadioRelationshipSnapshot["current"]>,
-  catalogs: { citygis: CityGISSnapshot; locations: CityGISLocation[] } | null,
-): string {
-  if (entry.location) return entry.location.name;
-  if (!entry.target) return "Geen plaatsing";
-  const { id, kind } = entry.target;
-  if (kind === "vector") {
-    const vector = catalogs?.citygis.vectors.find((item) => item.managed_object.id === id);
-    return vector ? `${vector.abbreviation || vector.name || vector.vector_code} · ${vector.post?.name ?? "Zonder post"}` : `Vector #${id}`;
+function radioType(radio: RadioAsset): string {
+  if (radio.model) return `${radio.model.manufacturer} ${radio.model.name}`;
+  return radio.model_name || radio.manufacturer || "Model onbekend";
+}
+
+function addCalendarMonths(date: Date, months: number): Date {
+  const absoluteMonth = date.getMonth() + months;
+  const year = date.getFullYear() + Math.floor(absoluteMonth / 12);
+  const month = ((absoluteMonth % 12) + 12) % 12;
+  const day = Math.min(date.getDate(), new Date(year, month + 1, 0).getDate());
+  return new Date(year, month, day, date.getHours(), date.getMinutes(), date.getSeconds());
+}
+
+function formatSubscriptionDuration(startedAt: string, endedAt: string | null): string {
+  const start = new Date(startedAt);
+  const end = endedAt ? new Date(endedAt) : new Date();
+  if (end < start) return "0 dagen";
+
+  let years = end.getFullYear() - start.getFullYear();
+  let cursor = addCalendarMonths(start, years * 12);
+  if (cursor > end) {
+    years -= 1;
+    cursor = addCalendarMonths(start, years * 12);
   }
-  if (kind === "vehicle") {
-    const vehicle = catalogs?.citygis.vehicles.find((item) => item.managed_object.id === id);
-    return vehicle ? `${vehicle.alphacode} · ${vehicle.plate}` : `Voertuig #${id}`;
+
+  let months = (end.getFullYear() - cursor.getFullYear()) * 12 + end.getMonth() - cursor.getMonth();
+  let monthCursor = addCalendarMonths(cursor, months);
+  if (monthCursor > end) {
+    months -= 1;
+    monthCursor = addCalendarMonths(cursor, months);
   }
-  return `Pager #${id}`;
+  const startDay = Date.UTC(monthCursor.getFullYear(), monthCursor.getMonth(), monthCursor.getDate());
+  const endDay = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+  const days = Math.floor((endDay - startDay) / 86_400_000);
+  const parts = [
+    years ? `${years} jaar` : "",
+    months ? `${months} ${months === 1 ? "maand" : "maanden"}` : "",
+    days ? `${days} ${days === 1 ? "dag" : "dagen"}` : "",
+  ].filter(Boolean);
+  return parts.join(", ") || "0 dagen";
 }
 
 export function RadioManagementPage() {
@@ -62,23 +79,35 @@ export function RadioManagementPage() {
   const [subscriptions, setSubscriptions] = useState<RadioSubscription[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [models, setModels] = useState<RadioModel[]>([]);
-  const [ranges, setRanges] = useState<TeiRange[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [query, setQuery] = useState("");
+  const [modelFilters, setModelFilters] = useState<string[]>([]);
+  const [openModelFilterAnchor, setOpenModelFilterAnchor] = useState<HTMLElement | null>(null);
+  const [subscriptionQuery, setSubscriptionQuery] = useState("");
+  const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importResult, setImportResult] = useState<RadioSubscriptionImportResult | null>(null);
+  const [radioPickerQuery, setRadioPickerQuery] = useState("");
+  const [issiPickerQuery, setIssiPickerQuery] = useState("");
   const [radioSort, setRadioSort] = useState<{ column: RadioColumn; direction: SortDirection }>({
     column: "tei", direction: "ascending",
   });
   const [issiSort, setIssiSort] = useState<{ column: IssiColumn; direction: SortDirection }>({
     column: "issi", direction: "ascending",
   });
-  const [selectedRadioId, setSelectedRadioId] = useState<number | null>(null);
+  const [subscriptionSort, setSubscriptionSort] = useState<{ column: SubscriptionColumn; direction: SortDirection }>({
+    column: "radio", direction: "ascending",
+  });
   const [selectedIssiId, setSelectedIssiId] = useState<number | null>(null);
   const [radioFormOpen, setRadioFormOpen] = useState(false);
   const [editingRadio, setEditingRadio] = useState<RadioAsset | null>(null);
   const [radioFormError, setRadioFormError] = useState("");
   const [radioForm, setRadioForm] = useState({
-    tei: "", manufacturer: "", model_name: "", application: "portable" as Application, model_id: "",
+    tei: "", manufacturer: "", model_name: "", model_id: "",
   });
   const [issiFormOpen, setIssiFormOpen] = useState(false);
   const [editingIssi, setEditingIssi] = useState<IssiAsset | null>(null);
@@ -86,64 +115,68 @@ export function RadioManagementPage() {
   const [issiForm, setIssiForm] = useState({ issi: "", alias: "", organization_id: "" });
   const [assignmentForm, setAssignmentForm] = useState({ radio_id: "", issi_id: "" });
   const [assignmentError, setAssignmentError] = useState("");
-  const [referenceError, setReferenceError] = useState("");
-  const [organizationForm, setOrganizationForm] = useState({ id: 0, name: "" });
-  const [modelForm, setModelForm] = useState({
-    id: 0, manufacturer: "", name: "", application: "portable" as Application,
-  });
-  const [rangeForm, setRangeForm] = useState({ id: 0, model_id: "", start_tei: "", end_tei: "" });
-  const [radioRelationship, setRadioRelationship] = useState<RadioRelationshipSnapshot | null>(null);
-  const [relationshipCatalogs, setRelationshipCatalogs] = useState<{ citygis: CityGISSnapshot; locations: CityGISLocation[] } | null>(null);
-  const [relationshipLoading, setRelationshipLoading] = useState(false);
-  const [relationshipError, setRelationshipError] = useState("");
-  const [relationshipTarget, setRelationshipTarget] = useState("");
   const [syncError, setSyncError] = useState("");
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const radioTypesById = useMemo(
+    () => new Map<number, string>(radios.map((radio) => [radio.id, radioType(radio)] as const)),
+    [radios],
+  );
+  const modelFilterOptions = useMemo(() => [...new Set(radioTypesById.values())]
+    .sort((left, right) => compareText(left, right))
+    .map((value) => ({ value, label: value })), [radioTypesById]);
+
+  const visibleSubscriptions = useMemo(() => {
+    const needle = subscriptionQuery.trim().toLocaleLowerCase("nl-BE");
+    const direction = subscriptionSort.direction === "ascending" ? 1 : -1;
+    const rows = subscriptions.filter((item) => !needle || [item.radio.tei, radioTypesById.get(item.radio.id) ?? "", item.issi.issi]
+      .join(" ").toLocaleLowerCase("nl-BE").includes(needle));
+    return rows.sort((left, right) => {
+      let comparison = 0;
+      switch (subscriptionSort.column) {
+        case "radio": comparison = compareText(left.radio.tei, right.radio.tei); break;
+        case "issi": comparison = compareText(left.issi.issi, right.issi.issi); break;
+        case "type": comparison = compareText(radioTypesById.get(left.radio.id) ?? "Onbekend", radioTypesById.get(right.radio.id) ?? "Onbekend"); break;
+        case "dates": comparison = Date.parse(left.started_at) - Date.parse(right.started_at); break;
+      }
+      return comparison * direction || left.id - right.id;
+    });
+  }, [radioTypesById, subscriptionQuery, subscriptionSort, subscriptions]);
+
+  const activeSubscriptionCount = subscriptions.filter((item) => item.ended_at === null).length;
+
+  const radioChoices = useMemo(() => {
+    const needle = radioPickerQuery.trim().toLocaleLowerCase("nl-BE");
+    return radios.filter((radio) => !needle || [radio.tei, radio.model?.name, radio.model_name, radio.manufacturer]
+      .join(" ").toLocaleLowerCase("nl-BE").includes(needle));
+  }, [radioPickerQuery, radios]);
+
+  const issiChoices = useMemo(() => {
+    const needle = issiPickerQuery.trim().toLocaleLowerCase("nl-BE");
+    return issis.filter((item) => !needle || [item.issi, item.alias, item.organization?.name]
+      .join(" ").toLocaleLowerCase("nl-BE").includes(needle));
+  }, [issiPickerQuery, issis]);
+
+  const refresh = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setLoadError("");
     try {
-      const [radioRows, issiRows, subscriptionRows, organizationRows, modelRows, rangeRows] = await Promise.all([
+      const [radioRows, issiRows, subscriptionRows, organizationRows, modelRows] = await Promise.all([
         api.listRadios(), api.listIssis(), api.listRadioSubscriptions(), api.listOrganizations(),
-        api.listRadioModels(), api.listTeiRanges(),
+        api.listRadioModels(),
       ]);
       setRadios(radioRows);
       setIssis(issiRows);
       setSubscriptions(subscriptionRows);
       setOrganizations(organizationRows);
       setModels(modelRows);
-      setRanges(rangeRows);
     } catch (reason) {
       setLoadError(reason instanceof Error ? reason.message : "Radio-inventaris laden is niet gelukt.");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
-
-  useEffect(() => {
-    if (!selectedRadioId) {
-      setRadioRelationship(null);
-      return;
-    }
-    let active = true;
-    setRelationshipLoading(true);
-    setRelationshipError("");
-    void Promise.all([api.getRadioRelationship(selectedRadioId), api.getCityGIS(), api.listLocations()])
-      .then(([relationship, citygis, locations]) => {
-        if (!active) return;
-        setRadioRelationship(relationship);
-        setRelationshipCatalogs({ citygis, locations });
-        const current = relationship.current;
-        setRelationshipTarget(current?.location ? `location:${current.location.id}` : current?.target ? `object:${current.target.id}` : "");
-      })
-      .catch((reason: unknown) => {
-        if (active) setRelationshipError(reason instanceof Error ? reason.message : "Plaatsingsgegevens laden is niet gelukt.");
-      })
-      .finally(() => { if (active) setRelationshipLoading(false); });
-    return () => { active = false; };
-  }, [selectedRadioId]);
 
   const visibleRadios = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("nl-BE");
@@ -153,22 +186,22 @@ export function RadioManagementPage() {
         radio.tei, radio.manufacturer, radio.model_name, radio.model?.manufacturer, radio.model?.name,
         String(radio.fireplan_id ?? ""), radio.fireplan_qr_url, active?.issi.issi, active?.issi.alias,
       ].join(" ").toLocaleLowerCase("nl-BE");
-      return !needle || searchable.includes(needle);
+      return (!needle || searchable.includes(needle))
+        && (!modelFilters.length || modelFilters.includes(radioTypesById.get(radio.id) ?? "Onbekend"));
     });
     const direction = radioSort.direction === "ascending" ? 1 : -1;
     return rows.sort((left, right) => {
       const value = (radio: RadioAsset) => {
         switch (radioSort.column) {
           case "tei": return radio.tei;
-          case "application": return applicationLabels[radio.application];
-          case "model": return `${radio.model?.manufacturer ?? radio.manufacturer} ${radio.model?.name ?? radio.model_name}`;
+          case "model": return radioType(radio);
           case "fireplan_id": return String(radio.fireplan_id ?? "");
           case "issi": return radio.current_subscription?.issi.issi ?? "";
         }
       };
       return compareText(value(left), value(right)) * direction || left.id - right.id;
     });
-  }, [query, radioSort, radios]);
+  }, [modelFilters, query, radioSort, radioTypesById, radios]);
 
   const visibleIssis = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("nl-BE");
@@ -192,7 +225,6 @@ export function RadioManagementPage() {
     });
   }, [issiSort, issis, query]);
 
-  const selectedRadio = radios.find((radio) => radio.id === selectedRadioId) ?? null;
   const selectedIssi = issis.find((item) => item.id === selectedIssiId) ?? null;
 
   function toggleRadioSort(column: RadioColumn) {
@@ -209,6 +241,17 @@ export function RadioManagementPage() {
     }));
   }
 
+  function toggleModelFilter(anchor: HTMLElement) {
+    setOpenModelFilterAnchor((current) => current ? null : anchor);
+  }
+
+  function toggleSubscriptionSort(column: SubscriptionColumn) {
+    setSubscriptionSort((current) => ({
+      column,
+      direction: current.column === column && current.direction === "ascending" ? "descending" : "ascending",
+    }));
+  }
+
   function openRadioForm(radio: RadioAsset | null = null) {
     setEditingRadio(radio);
     setRadioFormError("");
@@ -216,9 +259,8 @@ export function RadioManagementPage() {
       tei: radio.tei,
       manufacturer: radio.manufacturer,
       model_name: radio.model_name,
-      application: radio.application,
       model_id: radio.model?.id ? String(radio.model.id) : "",
-    } : { tei: "", manufacturer: "", model_name: "", application: "portable", model_id: "" });
+    } : { tei: "", manufacturer: "", model_name: "", model_id: "" });
     setRadioFormOpen(true);
   }
 
@@ -229,7 +271,6 @@ export function RadioManagementPage() {
       tei: radioForm.tei,
       manufacturer: radioForm.manufacturer,
       model_name: radioForm.model_name,
-      application: radioForm.application,
       ...(radioForm.model_id ? { model_id: Number(radioForm.model_id) } : {}),
     };
     try {
@@ -248,7 +289,6 @@ export function RadioManagementPage() {
     if (!window.confirm(`Radio ${radio.tei} verwijderen?`)) return;
     try {
       await api.deleteRadio(radio.id);
-      if (selectedRadioId === radio.id) setSelectedRadioId(null);
       toast.success("Radio verwijderd.");
       await refresh();
     } catch (reason) {
@@ -265,27 +305,6 @@ export function RadioManagementPage() {
       navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
     } catch (reason) {
       setSyncError(reason instanceof Error ? reason.message : "Radiosynchronisatie starten is niet gelukt.");
-    }
-  }
-
-  async function saveRadioRelationship(event: FormEvent) {
-    event.preventDefault();
-    if (!selectedRadio) return;
-    setRelationshipError("");
-    const kind = selectedRadio.application === "portable" ? "assigned_to" : selectedRadio.application === "vehicle" ? "mounted_in" : "installed_in";
-    const locationId = relationshipTarget.startsWith("location:") ? Number(relationshipTarget.slice("location:".length)) : null;
-    const objectId = relationshipTarget.startsWith("object:") ? Number(relationshipTarget.slice("object:".length)) : null;
-    try {
-      const updated = await api.updateRadioRelationship(selectedRadio.id, {
-        kind, target_object_id: objectId, location_id: locationId,
-      });
-      setRadioRelationship(updated);
-      const current = updated.current;
-      setRelationshipTarget(current?.location ? `location:${current.location.id}` : current?.target ? `object:${current.target.id}` : "");
-      await refresh();
-      toast.success("Radio-plaatsing bijgewerkt.");
-    } catch (reason) {
-      setRelationshipError(reason instanceof Error ? reason.message : "Radio-plaatsing opslaan is niet gelukt.");
     }
   }
 
@@ -336,6 +355,9 @@ export function RadioManagementPage() {
     try {
       await api.assignRadioSubscription(Number(assignmentForm.radio_id), Number(assignmentForm.issi_id));
       setAssignmentForm({ radio_id: "", issi_id: "" });
+      setAssignmentOpen(false);
+      setRadioPickerQuery("");
+      setIssiPickerQuery("");
       toast.success("Abonnement bijgewerkt.");
       await refresh();
     } catch (reason) {
@@ -343,67 +365,70 @@ export function RadioManagementPage() {
     }
   }
 
-  async function saveOrganization(event: FormEvent) {
+  function openImport() {
+    setImportFile(null);
+    setImportError("");
+    setImportResult(null);
+    setImportOpen(true);
+  }
+
+  const closeImport = useCallback(() => setImportOpen(false), []);
+
+  async function importSubscriptions(event: FormEvent) {
     event.preventDefault();
-    setReferenceError("");
+    if (!importFile) {
+      setImportError("Selecteer eerst een CSV-bestand.");
+      return;
+    }
+    setImportBusy(true);
+    setImportError("");
+    setImportResult(null);
     try {
-      if (organizationForm.id) await api.updateOrganization(organizationForm.id, { name: organizationForm.name });
-      else await api.createOrganization({ name: organizationForm.name });
-      setOrganizationForm({ id: 0, name: "" });
-      await refresh();
+      const result = await api.importRadioSubscriptions(importFile);
+      setImportResult(result);
+      await refresh(false);
+      toast.success("ASTRID-abonnementen verwerkt.");
     } catch (reason) {
-      setReferenceError(reason instanceof Error ? reason.message : "Organisatie opslaan is niet gelukt.");
+      setImportError(reason instanceof Error ? reason.message : "Het bestand verwerken is niet gelukt.");
+    } finally {
+      setImportBusy(false);
     }
   }
 
-  async function saveModel(event: FormEvent) {
-    event.preventDefault();
-    setReferenceError("");
-    const values = { manufacturer: modelForm.manufacturer, name: modelForm.name, application: modelForm.application };
-    try {
-      if (modelForm.id) await api.updateRadioModel(modelForm.id, values);
-      else await api.createRadioModel(values);
-      setModelForm({ id: 0, manufacturer: "", name: "", application: "portable" });
-      await refresh();
-    } catch (reason) {
-      setReferenceError(reason instanceof Error ? reason.message : "Radiomodel opslaan is niet gelukt.");
-    }
+  function openAssignmentForm() {
+    setAssignmentError("");
+    setAssignmentForm({ radio_id: "", issi_id: "" });
+    setRadioPickerQuery("");
+    setIssiPickerQuery("");
+    setAssignmentOpen(true);
   }
 
-  async function saveRange(event: FormEvent) {
-    event.preventDefault();
-    setReferenceError("");
-    const values = {
-      model_id: Number(rangeForm.model_id), start_tei: rangeForm.start_tei, end_tei: rangeForm.end_tei,
-    };
-    try {
-      if (rangeForm.id) await api.updateTeiRange(rangeForm.id, values);
-      else await api.createTeiRange(values);
-      setRangeForm({ id: 0, model_id: "", start_tei: "", end_tei: "" });
-      await refresh();
-    } catch (reason) {
-      setReferenceError(reason instanceof Error ? reason.message : "TEI-bereik opslaan is niet gelukt.");
-    }
-  }
-
-  async function removeReference(kind: "organization" | "model" | "range", id: number) {
-    if (!window.confirm("Deze referentie verwijderen?")) return;
-    try {
-      if (kind === "organization") await api.deleteOrganization(id);
-      if (kind === "model") await api.deleteRadioModel(id);
-      if (kind === "range") await api.deleteTeiRange(id);
-      await refresh();
-    } catch (reason) {
-      setReferenceError(reason instanceof Error ? reason.message : "Referentie verwijderen is niet gelukt.");
-    }
-  }
-
-  function sortedHeader(label: string, column: string, active: boolean, direction: SortDirection | null, onClick: () => void) {
-    const icon = active ? (direction === "ascending" ? "↑" : "↓") : "↕";
-    return <th key={column} scope="col" aria-sort={active ? direction ?? undefined : undefined} className="px-3 py-2.5 align-middle font-normal">
-      <button type="button" className="inline-flex items-center gap-2 whitespace-nowrap font-medium" aria-label={`Sorteer op ${label.toLocaleLowerCase("nl-BE")}`} onClick={onClick}>
-        {label}<span aria-hidden="true" className="text-muted-foreground">{icon}</span>
-      </button>
+  function sortedHeader(
+    label: string,
+    column: string,
+    active: boolean,
+    direction: SortDirection,
+    onClick: () => void,
+    filter?: { selectedCount: number; open: boolean; onToggle: (anchor: HTMLElement) => void },
+  ) {
+    const Icon = !active ? ArrowDownUp : direction === "ascending" ? ArrowUp : ArrowDown;
+    return <th key={column} scope="col" aria-sort={active ? direction : undefined} className="px-4 py-3 align-middle font-normal">
+      <div className="flex min-h-6 items-center gap-2 whitespace-nowrap">
+        <button type="button" className="inline-flex min-w-0 items-center gap-2 font-medium" aria-label={`Sorteer op ${label.toLocaleLowerCase("nl-BE")}`} onClick={onClick}>
+          {label}<Icon aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
+        {filter && <button
+          type="button"
+          className={`relative inline-flex h-6 w-6 shrink-0 items-center justify-center border ${filter.selectedCount ? "text-primary" : "text-muted-foreground"}`}
+          aria-label={`${filter.open ? "Sluit" : "Open"} filter voor ${label}${filter.selectedCount ? `, ${filter.selectedCount} geselecteerd` : ""}`}
+          title={`Filter op ${label.toLocaleLowerCase("nl-BE")}`}
+          aria-expanded={filter.open}
+          onClick={(event) => filter.onToggle(event.currentTarget)}
+        >
+          <Filter aria-hidden="true" className="h-3.5 w-3.5" />
+          {filter.selectedCount > 0 && <span aria-hidden="true" className="absolute -right-3 -top-2 grid h-4 min-w-4 place-items-center !rounded-full bg-primary px-1 text-[9px] leading-none text-primary-foreground">{filter.selectedCount}</span>}
+        </button>}
+      </div>
     </th>;
   }
 
@@ -412,112 +437,118 @@ export function RadioManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-medium text-primary">Assetbeheer</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Radio's</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Radio's, ISSI's, abonnementen en configureerbare TEI-modelbereiken.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-primary">Assetbeheer</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Radio's</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Radio's, ISSI's, abonnementen en configureerbare TEI-modelbereiken.</p>
+        </div>
+        {isStaff && <div className="flex flex-wrap items-center gap-2">
+          {activeTab === "radios" && <>
+            <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => void startRadioSync()} aria-label="Synchroniseer met FirePlan" title="Synchroniseer met FirePlan"><CloudRefreshIcon /></Button>
+            <Button type="button" size="icon" className="h-9 w-9" onClick={() => openRadioForm()} aria-label="Radio toevoegen" title="Nieuwe radio"><Plus className="h-4 w-4" /></Button>
+          </>}
+          {activeTab === "issis" && <Button type="button" size="icon" className="h-9 w-9" onClick={() => openIssiForm()} aria-label="ISSI toevoegen" title="Nieuwe ISSI"><Plus className="h-4 w-4" /></Button>}
+          {activeTab === "subscriptions" && <>
+            <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={openImport} aria-label="Abonnementen importeren" title="Abonnementen importeren"><Upload className="h-4 w-4" /></Button>
+            <Button type="button" size="icon" className="h-9 w-9" onClick={openAssignmentForm} aria-label="Abonnement toevoegen" title="Nieuw abonnement"><Plus className="h-4 w-4" /></Button>
+          </>}
+        </div>}
       </div>
 
       <div role="tablist" aria-label="Radiobeheer" className="flex flex-wrap gap-2 border-b">
-        {([["radios", "Radio's"], ["issis", "ISSI's"], ["subscriptions", "Abonnementen"]] as const).map(([tab, label]) => (
-          <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={`border-b-2 px-4 py-2.5 text-sm ${activeTab === tab ? "border-primary font-medium" : "border-transparent text-muted-foreground"}`} onClick={() => { setActiveTab(tab); setQuery(""); }}>
+        {([["radios", "Toestellen"], ["issis", "ISSI's"], ["subscriptions", "Abonnementen"]] as const).map(([tab, label]) => (
+          <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={`border-b-2 px-4 py-2.5 text-sm ${activeTab === tab ? "border-primary font-medium" : "border-transparent text-muted-foreground"}`} onClick={() => { setActiveTab(tab); setQuery(""); setOpenModelFilterAnchor(null); }}>
             {label}
           </button>
         ))}
       </div>
 
-      {activeTab !== "subscriptions" && <label className="block max-w-md space-y-1 text-sm font-medium" htmlFor="radio-module-search">
-        <span>{activeTab === "radios" ? "Radio's zoeken" : "ISSI's zoeken"}</span>
-        <Input id="radio-module-search" type="search" role="searchbox" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={activeTab === "radios" ? "TEI, model, FirePlan-ID of ISSI" : "ISSI, alias, organisatie of radio"} />
-      </label>}
-
-      {activeTab === "radios" && <div className="flex flex-wrap items-start justify-between gap-4 border p-4">
-        <RadioScanLookup onRadioIdentified={(radio) => setSelectedRadioId(radio.id)} />
-        {isStaff && <div className="space-y-2">
-          <Button type="button" onClick={() => void startRadioSync()}>Synchroniseer radio's met FirePlan</Button>
-          {syncError && <p role="alert" className="text-sm text-red-700">{syncError}</p>}
-        </div>}
-      </div>}
-
       {activeTab === "radios" && <Card>
-        <CardHeader className="flex-col items-stretch gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="flex-col items-stretch gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div><CardTitle>Radio's</CardTitle><CardDescription>{radios.length} geregistreerd</CardDescription></div>
-          {isStaff && <Button type="button" onClick={() => openRadioForm()}><Plus className="h-4 w-4" />Radio toevoegen</Button>}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <label className="relative min-w-48 flex-1 sm:w-64 sm:flex-none">
+              <span className="sr-only">Radio's zoeken</span><Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input id="radio-module-search" type="search" role="searchbox" className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek TEI, model of ISSI" />
+            </label>
+            <PagerScanControl subject="Radio" onScan={async (raw) => {
+              try { const result = await api.lookupRadioScan(raw); navigate(`/radios/${result.radio.id}`); }
+              catch (reason) { toast.error(reason instanceof Error ? reason.message : "Radio scannen is niet gelukt."); }
+            }} />
+            {syncError && <p role="alert" className="w-full text-sm text-red-700">{syncError}</p>}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {radios.length > 0 && <div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed border-collapse text-left text-sm">
-            <colgroup><col className="w-[18%]" /><col className="w-[17%]" /><col className="w-[27%]" /><col className="w-[16%]" /><col className="w-[22%]" /></colgroup>
+            <colgroup>
+              <col className={isStaff ? "w-[22%]" : "w-[25%]"} />
+              <col className={isStaff ? "w-[29%]" : "w-[34%]"} />
+              <col className={isStaff ? "w-[16%]" : "w-[18%]"} />
+              <col className={isStaff ? "w-[19%]" : "w-[23%]"} />
+              {isStaff && <col className="w-[14%]" />}
+            </colgroup>
             <thead className="border-b bg-muted/50 text-xs text-muted-foreground"><tr>
               {sortedHeader("TEI", "tei", radioSort.column === "tei", radioSort.direction, () => toggleRadioSort("tei"))}
-              {sortedHeader("Toepassing", "application", radioSort.column === "application", radioSort.direction, () => toggleRadioSort("application"))}
-              {sortedHeader("Model", "model", radioSort.column === "model", radioSort.direction, () => toggleRadioSort("model"))}
+              {sortedHeader("Model", "model", radioSort.column === "model", radioSort.direction, () => toggleRadioSort("model"), {
+                selectedCount: modelFilters.length,
+                open: openModelFilterAnchor !== null,
+                onToggle: toggleModelFilter,
+              })}
               {sortedHeader("FirePlan-ID", "fireplan_id", radioSort.column === "fireplan_id", radioSort.direction, () => toggleRadioSort("fireplan_id"))}
-              <th scope="col" className="px-3 py-2.5 align-middle font-normal">ISSI · Acties</th>
+              {sortedHeader("ISSI", "issi", radioSort.column === "issi", radioSort.direction, () => toggleRadioSort("issi"))}
+              {isStaff && <th scope="col" className="px-4 py-3 text-right align-middle font-medium">Acties</th>}
             </tr></thead>
             <tbody className="divide-y">
               {visibleRadios.map((radio) => <tr key={radio.id} className="hover:bg-muted/30">
-                <td className="px-3 py-2.5 font-mono"><button type="button" className="text-left hover:underline" aria-label={`Details radio ${radio.tei}`} onClick={() => setSelectedRadioId(selectedRadioId === radio.id ? null : radio.id)}>{radio.tei}</button></td>
-                <td className="px-3 py-2.5">{applicationLabels[radio.application]}</td>
-                <td className="px-3 py-2.5">{radio.model ? `${radio.model.manufacturer} ${radio.model.name}` : radio.model_name || radio.manufacturer || "Model onbekend"}</td>
-                <td className="px-3 py-2.5">{radio.fireplan_id ?? "—"}</td>
-                <td className="px-3 py-2.5"><div className="flex items-center justify-between gap-2"><span>{radio.current_subscription?.issi.issi ?? "Geen ISSI"}</span><span className="inline-flex shrink-0 gap-1">
-                  {isStaff && <>
+                <td className="px-4 py-3 font-mono"><Link className="hover:underline" aria-label={`Details radio ${radio.tei}`} to={`/radios/${radio.id}`}>{radio.tei}</Link></td>
+                <td className="px-4 py-3">{radioType(radio)}</td>
+                <td className="px-4 py-3">{radio.fireplan_id ?? "—"}</td>
+                <td className="px-4 py-3">{radio.current_subscription?.issi.issi ?? "Geen ISSI"}</td>
+                {isStaff && <td className="px-4 py-3 text-right"><div className="inline-flex gap-1">
                     <Button type="button" variant="ghost" size="icon" aria-label={`Bewerk radio ${radio.tei}`} title={`Bewerk radio ${radio.tei}`} onClick={() => openRadioForm(radio)}><Pencil className="h-4 w-4" /></Button>
                     <Button type="button" variant="ghost" size="icon" aria-label={`Verwijder radio ${radio.tei}`} title={`Verwijder radio ${radio.tei}`} onClick={() => void removeRadio(radio)}><Trash2 className="h-4 w-4 text-red-700" /></Button>
-                  </>}
-                </span></div></td>
+                </div></td>}
               </tr>)}
-              {!visibleRadios.length && <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">Geen radio's gevonden.</td></tr>}
+              {!visibleRadios.length && <tr><td colSpan={isStaff ? 5 : 4} className="px-4 py-8 text-center text-muted-foreground">Geen radio's gevonden.</td></tr>}
             </tbody>
           </table></div>}
           {radios.length === 0 && <p className="p-8 text-sm text-muted-foreground">Nog geen radio's geregistreerd.</p>}
-          {selectedRadio && <div className="border-t p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold">Radio {selectedRadio.tei}</h2>
-              <Button type="button" size="icon" variant="ghost" aria-label="Sluit radio details" title="Sluit radio details" onClick={() => setSelectedRadioId(null)}><X className="h-4 w-4" /></Button>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">FirePlan-ID: {selectedRadio.fireplan_id ?? "—"}{selectedRadio.fireplan_qr_url ? <> · QR: <a className="underline" href={selectedRadio.fireplan_qr_url} target="_blank" rel="noreferrer">open bron-QR</a></> : ""}</p>
-            <h3 className="mt-4 font-medium">Abonnementshistoriek</h3>
-            {selectedRadio.subscription_history?.length ? <ol className="mt-3 space-y-2">{selectedRadio.subscription_history.map((item) => <li key={item.id} className="border bg-white p-3 text-sm"><span className="font-medium">{item.issi.issi} · {item.issi.alias}</span><span className="ml-2 text-muted-foreground">{item.ended_at ? "Beëindigd" : "Actief"}</span><span className="mt-1 block text-xs text-muted-foreground">{formatDate(item.started_at)} – {formatDate(item.ended_at)}</span></li>)}</ol> : <p className="mt-3 text-sm text-muted-foreground">Geen abonnementshistoriek.</p>}
-            <section aria-label="Radio plaatsing" className="mt-5 space-y-3">
-              <h3 className="font-medium">Plaatsing</h3>
-              {relationshipLoading && <p role="status" className="text-sm text-muted-foreground">Plaatsingshistoriek laden…</p>}
-              {relationshipError && <p role="alert" className="text-sm text-red-700">{relationshipError}</p>}
-              {radioRelationship && <>
-                <p className="text-sm">Huidige bestemming: {radioRelationship.current ? relationshipLabel(radioRelationship.current, relationshipCatalogs) : "Geen plaatsing"}</p>
-                {isStaff && relationshipCatalogs && <form onSubmit={(event) => void saveRadioRelationship(event)} className="flex flex-wrap items-end gap-2">
-                  <label className="min-w-64 flex-1 space-y-1 text-sm font-medium" htmlFor="radio-placement-target">{selectedRadio.application === "portable" ? "Vector" : selectedRadio.application === "vehicle" ? "Voertuig" : "Locatie"}
-                    <select id="radio-placement-target" className="flex h-10 w-full border bg-white px-3 text-sm" value={relationshipTarget} onChange={(event) => setRelationshipTarget(event.target.value)}>
-                      <option value="">Geen plaatsing</option>
-                      {selectedRadio.application === "portable" && relationshipCatalogs.citygis.vectors.filter((item) => item.is_current).map((item) => <option key={item.managed_object.id} value={`object:${item.managed_object.id}`}>{item.abbreviation || item.name || item.vector_code} · {item.post?.name ?? "Zonder post"}</option>)}
-                      {selectedRadio.application === "vehicle" && relationshipCatalogs.citygis.vehicles.filter((item) => item.is_current).map((item) => <option key={item.managed_object.id} value={`object:${item.managed_object.id}`}>{item.alphacode} · {item.plate}</option>)}
-                      {selectedRadio.application === "fixed" && relationshipCatalogs.locations.map((item) => <option key={item.id} value={`location:${item.id}`}>{item.name}</option>)}
-                    </select>
-                  </label>
-                  <Button type="submit">Plaatsing bewaren</Button>
-                </form>}
-                <h4 className="text-sm font-medium">Plaatsingshistoriek</h4>
-                {radioRelationship.history.length ? <ul className="space-y-1 text-sm text-muted-foreground">{radioRelationship.history.map((item) => <li key={item.id}>{relationshipLabel(item, relationshipCatalogs)} · {formatDate(item.started_at)} – {item.ended_at ? formatDate(item.ended_at) : "Actueel"}</li>)}</ul> : <p className="text-sm text-muted-foreground">Geen plaatsingshistoriek.</p>}
-              </>}
-            </section>
-          </div>}
-          {radioFormOpen && <form onSubmit={(event) => void saveRadio(event)} className="grid gap-3 border-t p-4 sm:grid-cols-2">
-            <h2 className="text-lg font-semibold sm:col-span-2">{editingRadio ? "Radio bewerken" : "Radio toevoegen"}</h2>
-            <label className="space-y-1 text-sm font-medium" htmlFor="radio-tei">TEI<Input id="radio-tei" required maxLength={15} value={radioForm.tei} onChange={(event) => setRadioForm({ ...radioForm, tei: event.target.value })} /></label>
-            <label className="space-y-1 text-sm font-medium" htmlFor="radio-application">Radio toepassing<select id="radio-application" className="flex h-10 w-full border bg-white px-3 text-sm" value={radioForm.application} onChange={(event) => setRadioForm({ ...radioForm, application: event.target.value as Application })}><option value="portable">Draagbaar</option><option value="vehicle">Voertuiggebonden</option><option value="fixed">Vast</option></select></label>
-            <label className="space-y-1 text-sm font-medium" htmlFor="radio-manufacturer">Fabrikant<Input id="radio-manufacturer" value={radioForm.manufacturer} onChange={(event) => setRadioForm({ ...radioForm, manufacturer: event.target.value })} /></label>
-            <label className="space-y-1 text-sm font-medium" htmlFor="radio-model-name">Modelnaam<Input id="radio-model-name" value={radioForm.model_name} onChange={(event) => setRadioForm({ ...radioForm, model_name: event.target.value })} /></label>
-            <label className="space-y-1 text-sm font-medium sm:col-span-2" htmlFor="radio-model-reference">TEI-modelreferentie<select id="radio-model-reference" className="flex h-10 w-full border bg-white px-3 text-sm" value={radioForm.model_id} onChange={(event) => setRadioForm({ ...radioForm, model_id: event.target.value })}><option value="">Automatisch op TEI-bereik</option>{models.filter((model) => model.application === radioForm.application).map((model) => <option key={model.id} value={model.id}>{model.manufacturer} {model.name}</option>)}</select></label>
-            {radioFormError && <p role="alert" className="text-sm text-red-700 sm:col-span-2">{radioFormError}</p>}
-            <div className="flex gap-2 sm:col-span-2"><Button type="submit">Radio opslaan</Button><Button type="button" variant="outline" onClick={() => setRadioFormOpen(false)}>Annuleren</Button></div>
-          </form>}
         </CardContent>
       </Card>}
 
+      {radioFormOpen && activeTab === "radios" && <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setRadioFormOpen(false); }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="radio-form-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border bg-background p-5 shadow-xl" onKeyDown={(event) => { if (event.key === "Escape") setRadioFormOpen(false); }}>
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div><h2 id="radio-form-title" className="text-lg font-semibold">{editingRadio ? `Radio ${editingRadio.tei} bewerken` : "Radio toevoegen"}</h2><p className="text-sm text-muted-foreground">Pas de toestelgegevens aan.</p></div>
+            <Button type="button" variant="ghost" size="icon" aria-label="Sluiten" title="Sluiten" onClick={() => setRadioFormOpen(false)}><X className="h-4 w-4" /></Button>
+          </div>
+          <form onSubmit={(event) => void saveRadio(event)} className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-1 text-sm font-medium" htmlFor="radio-tei">TEI<Input id="radio-tei" autoFocus required maxLength={15} pattern="[0-9]{14,15}" value={radioForm.tei} onChange={(event) => setRadioForm({ ...radioForm, tei: event.target.value })} /></label>
+            <label className="space-y-1 text-sm font-medium" htmlFor="radio-manufacturer">Fabrikant<Input id="radio-manufacturer" value={radioForm.manufacturer} onChange={(event) => setRadioForm({ ...radioForm, manufacturer: event.target.value })} /></label>
+            <label className="space-y-1 text-sm font-medium" htmlFor="radio-model-name">Modelnaam<Input id="radio-model-name" value={radioForm.model_name} onChange={(event) => setRadioForm({ ...radioForm, model_name: event.target.value })} /></label>
+            <label className="space-y-1 text-sm font-medium sm:col-span-2" htmlFor="radio-model-reference">TEI-modelreferentie<select id="radio-model-reference" className="flex h-10 w-full border bg-white px-3 text-sm" value={radioForm.model_id} onChange={(event) => setRadioForm({ ...radioForm, model_id: event.target.value })}><option value="">Automatisch op TEI-bereik</option>{models.map((model) => <option key={model.id} value={model.id}>{model.manufacturer} {model.name}</option>)}</select></label>
+            {editingRadio && <dl className="grid gap-3 border bg-muted/20 p-3 text-sm sm:col-span-2 sm:grid-cols-2">
+              <div><dt className="text-muted-foreground">FirePlan-ID</dt><dd className="font-medium">{editingRadio.fireplan_id ?? "—"}</dd></div>
+              <div><dt className="text-muted-foreground">Gekoppelde ISSI</dt><dd className="font-medium">{editingRadio.current_subscription ? `${editingRadio.current_subscription.issi.issi} · ${editingRadio.current_subscription.issi.alias}` : "Geen ISSI"}</dd></div>
+              <div><dt className="text-muted-foreground">FirePlan-QR</dt><dd className="font-medium">{editingRadio.fireplan_qr_url ? <a className="underline" href={editingRadio.fireplan_qr_url} target="_blank" rel="noreferrer">QR openen</a> : "—"}</dd></div>
+              <div><dt className="text-muted-foreground">Geregistreerd / bijgewerkt</dt><dd className="font-medium">{formatDate(editingRadio.created_at)} · {formatDate(editingRadio.updated_at)}</dd></div>
+            </dl>}
+            {radioFormError && <p role="alert" className="text-sm text-red-700 sm:col-span-2">{radioFormError}</p>}
+            <div className="flex justify-end gap-2 border-t pt-4 sm:col-span-2"><Button type="button" variant="outline" onClick={() => setRadioFormOpen(false)}>Annuleren</Button><Button type="submit">Radio opslaan</Button></div>
+          </form>
+        </section>
+      </div>}
+
       {activeTab === "issis" && <Card>
-        <CardHeader className="flex-col items-stretch gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="flex-col items-stretch gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div><CardTitle>ISSI's</CardTitle><CardDescription>{issis.length} geregistreerd</CardDescription></div>
-          {isStaff && <Button type="button" onClick={() => openIssiForm()}><Plus className="h-4 w-4" />ISSI toevoegen</Button>}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <label className="relative min-w-48 flex-1 sm:w-64 sm:flex-none">
+              <span className="sr-only">ISSI's zoeken</span><Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input type="search" role="searchbox" className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek ISSI-nummer of alias" />
+            </label>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto"><table className="w-full min-w-[680px] table-fixed border-collapse text-left text-sm">
@@ -553,28 +584,128 @@ export function RadioManagementPage() {
       </Card>}
 
       {activeTab === "subscriptions" && <Card>
-        <CardHeader><CardTitle>Abonnementen</CardTitle><CardDescription>Actuele en beëindigde radio-ISSI-koppelingen</CardDescription></CardHeader>
-        {isStaff && <form onSubmit={(event) => void assignSubscription(event)} className="grid gap-3 border-y p-4 sm:grid-cols-[1fr_1fr_auto]">
-          <label className="space-y-1 text-sm font-medium" htmlFor="subscription-radio">Radio<select id="subscription-radio" required className="flex h-10 w-full border bg-white px-3 text-sm" value={assignmentForm.radio_id} onChange={(event) => setAssignmentForm({ ...assignmentForm, radio_id: event.target.value })}><option value="">Kies een radio</option>{radios.map((radio) => <option key={radio.id} value={radio.id}>{radio.tei}</option>)}</select></label>
-          <label className="space-y-1 text-sm font-medium" htmlFor="subscription-issi">ISSI<select id="subscription-issi" required className="flex h-10 w-full border bg-white px-3 text-sm" value={assignmentForm.issi_id} onChange={(event) => setAssignmentForm({ ...assignmentForm, issi_id: event.target.value })}><option value="">Kies een ISSI</option>{issis.map((item) => <option key={item.id} value={item.id}>{item.issi} · {item.alias}</option>)}</select></label>
-          <Button type="submit" className="self-end">Koppeling bevestigen</Button>
-          {assignmentError && <p role="alert" className="text-sm text-red-700 sm:col-span-3">{assignmentError}</p>}
-        </form>}
-        <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full min-w-[640px] table-fixed border-collapse text-left text-sm">
-          <colgroup><col className="w-[22%]" /><col className="w-[22%]" /><col className="w-[22%]" /><col className="w-[17%]" /><col className="w-[17%]" /></colgroup>
-          <thead className="border-b bg-muted/50 text-xs text-muted-foreground"><tr><th scope="col" className="px-3 py-2.5 font-normal">Radio</th><th scope="col" className="px-3 py-2.5 font-normal">ISSI</th><th scope="col" className="px-3 py-2.5 font-normal">Alias</th><th scope="col" className="px-3 py-2.5 font-normal">Status</th><th scope="col" className="px-3 py-2.5 font-normal">Start / einde</th></tr></thead>
-          <tbody className="divide-y">{subscriptions.map((item) => <tr key={item.id}><td className="px-3 py-2.5 font-mono">{item.radio.tei}</td><td className="px-3 py-2.5 font-mono">{item.issi.issi}</td><td className="px-3 py-2.5">{item.issi.alias}</td><td className="px-3 py-2.5">{subscriptionStatus(item)}</td><td className="px-3 py-2.5">{formatDate(item.started_at)}<span className="block text-xs text-muted-foreground">{formatDate(item.ended_at)}</span></td></tr>)}
-            {!subscriptions.length && <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">Nog geen abonnementen geregistreerd.</td></tr>}</tbody>
+        <CardHeader className="flex-col items-stretch gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div><CardTitle>Abonnementen</CardTitle><CardDescription>{activeSubscriptionCount} actief{activeSubscriptionCount === 1 ? " abonnement" : "e abonnementen"}</CardDescription></div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <label className="relative min-w-48 flex-1 sm:w-64 sm:flex-none">
+              <span className="sr-only">Abonnementen zoeken</span><Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input type="search" role="searchbox" className="pl-9" value={subscriptionQuery} onChange={(event) => setSubscriptionQuery(event.target.value)} placeholder="Zoek radio, ISSI of type" />
+            </label>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed border-collapse text-left text-sm">
+          <colgroup><col className="w-[20%]" /><col className="w-[20%]" /><col className="w-[25%]" /><col className="w-[35%]" /></colgroup>
+          <thead className="border-b bg-muted/50 text-xs text-muted-foreground"><tr>
+            {sortedHeader("Radio", "radio", subscriptionSort.column === "radio", subscriptionSort.direction, () => toggleSubscriptionSort("radio"))}
+            {sortedHeader("ISSI", "issi", subscriptionSort.column === "issi", subscriptionSort.direction, () => toggleSubscriptionSort("issi"))}
+            {sortedHeader("Radiotype", "type", subscriptionSort.column === "type", subscriptionSort.direction, () => toggleSubscriptionSort("type"))}
+            {sortedHeader("Start / einde", "dates", subscriptionSort.column === "dates", subscriptionSort.direction, () => toggleSubscriptionSort("dates"))}
+          </tr></thead>
+          <tbody className="divide-y">{visibleSubscriptions.map((item) => <tr key={item.id}>
+            <td className="px-3 py-2.5 font-mono">{item.radio.tei}</td>
+            <td className="px-3 py-2.5 font-mono">{item.issi.issi}</td>
+            <td className="px-3 py-2.5">{radioTypesById.get(item.radio.id) ?? "Onbekend"}</td>
+            <td className="px-3 py-2.5">
+              <span className="block">{new Intl.DateTimeFormat("nl-BE", { dateStyle: "medium" }).format(new Date(item.started_at))} – {item.ended_at ? new Intl.DateTimeFormat("nl-BE", { dateStyle: "medium" }).format(new Date(item.ended_at)) : "Actief"}</span>
+              <span className="block text-xs text-muted-foreground">Looptijd: {formatSubscriptionDuration(item.started_at, item.ended_at)}</span>
+            </td>
+          </tr>)}
+            {!visibleSubscriptions.length && <tr><td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">Geen abonnementen gevonden.</td></tr>}</tbody>
         </table></div></CardContent>
       </Card>}
 
-      {activeTab === "radios" && isStaff && <ReferenceManagement
-        organizations={organizations} models={models} ranges={ranges}
-        organizationForm={organizationForm} setOrganizationForm={setOrganizationForm} onSaveOrganization={saveOrganization}
-        modelForm={modelForm} setModelForm={setModelForm} onSaveModel={saveModel}
-        rangeForm={rangeForm} setRangeForm={setRangeForm} onSaveRange={saveRange}
-        onRemove={removeReference} error={referenceError}
+      {importOpen && isStaff && <ModalDialog title="ASTRID-abonnementen importeren" onClose={closeImport}>
+        <CardContent>
+          <form onSubmit={(event) => void importSubscriptions(event)} className="space-y-4">
+            <p className="text-sm text-muted-foreground">Het ISSI-nummer komt uit de kolom IDENTIFIER; SERIAL_NUMBER en de ASTRID-datum worden niet gebruikt. TEI’s van 14 cijfers krijgen een nul achteraan; TEI’s van 15 cijfers blijven ongewijzigd. Andere lengtes worden geweigerd. Spare subscriptions worden overgeslagen. Bestaande actieve koppelingen in het bestand behouden hun startdatum; nieuwe starten bij upload. Actieve koppelingen die niet meer in het bestand staan, eindigen bij upload.</p>
+            <label
+              htmlFor="subscription-csv-file"
+              className="flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 border border-dashed bg-muted/20 p-5 text-center"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                const dropped = event.dataTransfer.files[0];
+                if (dropped) { setImportFile(dropped); setImportError(""); setImportResult(null); }
+              }}
+            >
+              <Upload aria-hidden="true" className="h-6 w-6 text-muted-foreground" />
+              <span className="font-medium">Sleep het CSV-bestand hierheen</span>
+              <span className="text-sm text-muted-foreground">of blader naar een bestand</span>
+              <input
+                id="subscription-csv-file"
+                type="file"
+                accept=".csv,text/csv"
+                className="sr-only"
+                onChange={(event) => {
+                  setImportFile(event.target.files?.[0] ?? null);
+                  setImportError("");
+                  setImportResult(null);
+                }}
+              />
+            </label>
+            {importFile && <p className="text-sm" role="status">Geselecteerd bestand: <span className="font-medium">{importFile.name}</span></p>}
+            {importError && <p role="alert" className="text-sm text-red-700">{importError}</p>}
+            {importResult && <div role="status" className="space-y-1 border bg-muted/20 p-3 text-sm">
+              <p>{importResult.subscriptions} abonnementregels verwerkt uit {importResult.rows} CSV-regels.</p>
+              <p>{importResult.created_radios} radio’s en {importResult.created_issis} ISSI’s nieuw aangemaakt.</p>
+              <p>{importResult.ended_subscriptions} bestaande koppelingen beëindigd.</p>
+              <p>{importResult.skipped} regels overgeslagen.</p>
+              {importResult.issues.length > 0 && <ul className="max-h-32 list-inside list-disc overflow-y-auto text-muted-foreground">{importResult.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}
+            </div>}
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Button type="button" variant="outline" onClick={closeImport}>Sluiten</Button>
+              <Button type="submit" disabled={!importFile || importBusy}>{importBusy ? "Bezig met verwerken…" : "Verwerken"}</Button>
+            </div>
+          </form>
+        </CardContent>
+      </ModalDialog>}
+
+      {activeTab === "radios" && openModelFilterAnchor && <TableFilterPopover
+        anchor={openModelFilterAnchor}
+        label="Model"
+        options={modelFilterOptions}
+        selected={modelFilters}
+        onChange={setModelFilters}
+        onClose={() => setOpenModelFilterAnchor(null)}
       />}
+
+      {assignmentOpen && isStaff && <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setAssignmentOpen(false); }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="subscription-dialog-title" className="w-full max-w-xl border bg-background p-5 shadow-xl" onKeyDown={(event) => { if (event.key === "Escape") setAssignmentOpen(false); }}>
+          <div className="mb-4 flex items-center justify-between"><h2 id="subscription-dialog-title" className="text-lg font-semibold">Abonnement toevoegen</h2><Button type="button" variant="ghost" size="icon" aria-label="Sluiten" title="Sluiten" onClick={() => setAssignmentOpen(false)}><X className="h-4 w-4" /></Button></div>
+          <form onSubmit={(event) => void assignSubscription(event)} className="space-y-4">
+            <div className="space-y-2">
+              <label className="space-y-1 text-sm font-medium" htmlFor="subscription-radio-search">Radio zoeken
+                <Input id="subscription-radio-search" type="search" role="searchbox" value={radioPickerQuery} onChange={(event) => { setRadioPickerQuery(event.target.value); setAssignmentForm((current) => ({ ...current, radio_id: "" })); }} placeholder="Zoek op TEI of model" />
+              </label>
+              <PagerScanControl subject="Radio" onScan={async (raw) => {
+                try {
+                  const result = await api.lookupRadioScan(raw);
+                  setAssignmentForm((current) => ({ ...current, radio_id: String(result.radio.id) }));
+                  setRadioPickerQuery(result.radio.tei);
+                } catch (reason) { toast.error(reason instanceof Error ? reason.message : "Radio scannen is niet gelukt."); }
+              }} />
+              <label className="sr-only" htmlFor="subscription-radio">Selecteer radio</label>
+              <select id="subscription-radio" required className="flex h-10 w-full border bg-white px-3 text-sm" value={assignmentForm.radio_id} onChange={(event) => setAssignmentForm({ ...assignmentForm, radio_id: event.target.value })}>
+                <option value="">Kies een radio</option>{radioChoices.map((radio) => <option key={radio.id} value={radio.id}>{radio.tei} · {radio.model?.name ?? radio.model_name ?? "Model onbekend"}</option>)}
+              </select>
+              {!radioChoices.length && <p className="text-xs text-muted-foreground">Geen radio's gevonden.</p>}
+            </div>
+            <div className="space-y-2">
+              <label className="space-y-1 text-sm font-medium" htmlFor="subscription-issi-search">ISSI zoeken
+                <Input id="subscription-issi-search" type="search" role="searchbox" value={issiPickerQuery} onChange={(event) => { setIssiPickerQuery(event.target.value); setAssignmentForm((current) => ({ ...current, issi_id: "" })); }} placeholder="Zoek op ISSI-nummer of alias" />
+              </label>
+              <label className="sr-only" htmlFor="subscription-issi">Selecteer ISSI</label>
+              <select id="subscription-issi" required className="flex h-10 w-full border bg-white px-3 text-sm" value={assignmentForm.issi_id} onChange={(event) => setAssignmentForm({ ...assignmentForm, issi_id: event.target.value })}>
+                <option value="">Kies een ISSI</option>{issiChoices.map((item) => <option key={item.id} value={item.id}>{item.issi} · {item.alias}</option>)}
+              </select>
+              {!issiChoices.length && <p className="text-xs text-muted-foreground">Geen ISSI's gevonden.</p>}
+            </div>
+            {assignmentError && <p role="alert" className="text-sm text-red-700">{assignmentError}</p>}
+            <div className="flex justify-end gap-2 border-t pt-4"><Button type="button" variant="outline" onClick={() => setAssignmentOpen(false)}>Annuleren</Button><Button type="submit">Koppelen</Button></div>
+          </form>
+        </section>
+      </div>}
+
     </div>
   );
 }
@@ -584,40 +715,4 @@ function HistoryPanel({ title, history, onClose }: { title: string; history: Rad
     <div className="flex items-center justify-between"><div><h2 className="font-semibold">{title}</h2><p className="text-sm text-muted-foreground">Abonnementshistoriek</p></div><Button type="button" variant="ghost" size="icon" aria-label="Details sluiten" title="Details sluiten" onClick={onClose}><X className="h-4 w-4" /></Button></div>
     {!history.length ? <p className="mt-3 text-sm text-muted-foreground">Geen abonnementshistoriek.</p> : <ol className="mt-3 space-y-2">{history.map((item) => <li key={item.id} className="border bg-white p-3 text-sm"><span className="font-medium">{item.issi.issi} · {item.issi.alias}</span><span className="ml-2 text-muted-foreground">{item.ended_at ? "Beëindigd" : "Actief"}</span><span className="mt-1 block text-xs text-muted-foreground">{formatDate(item.started_at)} – {formatDate(item.ended_at)}</span></li>)}</ol>}
   </section>;
-}
-
-function ReferenceManagement({
-  organizations, models, ranges, organizationForm, setOrganizationForm, onSaveOrganization,
-  modelForm, setModelForm, onSaveModel, rangeForm, setRangeForm, onSaveRange, onRemove, error,
-}: {
-  organizations: Organization[];
-  models: RadioModel[];
-  ranges: TeiRange[];
-  organizationForm: { id: number; name: string };
-  setOrganizationForm: (value: { id: number; name: string }) => void;
-  onSaveOrganization: (event: FormEvent) => void;
-  modelForm: { id: number; manufacturer: string; name: string; application: Application };
-  setModelForm: (value: { id: number; manufacturer: string; name: string; application: Application }) => void;
-  onSaveModel: (event: FormEvent) => void;
-  rangeForm: { id: number; model_id: string; start_tei: string; end_tei: string };
-  setRangeForm: (value: { id: number; model_id: string; start_tei: string; end_tei: string }) => void;
-  onSaveRange: (event: FormEvent) => void;
-  onRemove: (kind: "organization" | "model" | "range", id: number) => void;
-  error: string;
-}) {
-  return <details className="border bg-white">
-    <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Organisaties, radiomodellen en TEI-bereiken beheren</summary>
-    <div className="grid gap-6 border-t p-4 xl:grid-cols-3">
-      <section className="space-y-3"><h2 className="font-semibold">Organisaties</h2><form onSubmit={(event) => void onSaveOrganization(event)} className="flex gap-2"><label className="sr-only" htmlFor="organization-name">Organisatienaam</label><Input id="organization-name" required value={organizationForm.name} onChange={(event) => setOrganizationForm({ ...organizationForm, name: event.target.value })} placeholder="Organisatienaam" /><Button type="submit">{organizationForm.id ? "Bewaren" : "Toevoegen"}</Button></form>
-        <ul className="divide-y border text-sm">{organizations.map((item) => <li key={item.id} className="flex items-center justify-between gap-2 px-3 py-2"><span>{item.name}</span><span className="flex gap-1"><Button type="button" variant="ghost" size="icon" aria-label={`Bewerk organisatie ${item.name}`} title={`Bewerk organisatie ${item.name}`} onClick={() => setOrganizationForm({ id: item.id, name: item.name })}><Pencil className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" aria-label={`Verwijder organisatie ${item.name}`} title={`Verwijder organisatie ${item.name}`} onClick={() => onRemove("organization", item.id)}><Trash2 className="h-4 w-4 text-red-700" /></Button></span></li>)}</ul>
-      </section>
-      <section className="space-y-3"><h2 className="font-semibold">Radiomodellen</h2><form onSubmit={(event) => void onSaveModel(event)} className="grid gap-2"><label className="sr-only" htmlFor="model-manufacturer">Fabrikant</label><Input id="model-manufacturer" required value={modelForm.manufacturer} onChange={(event) => setModelForm({ ...modelForm, manufacturer: event.target.value })} placeholder="Fabrikant" /><label className="sr-only" htmlFor="model-name">Modelnaam</label><Input id="model-name" required value={modelForm.name} onChange={(event) => setModelForm({ ...modelForm, name: event.target.value })} placeholder="Modelnaam" /><label className="sr-only" htmlFor="model-application">Toepassing</label><select id="model-application" className="flex h-10 border bg-white px-3 text-sm" value={modelForm.application} onChange={(event) => setModelForm({ ...modelForm, application: event.target.value as Application })}><option value="portable">Draagbaar</option><option value="vehicle">Voertuiggebonden</option><option value="fixed">Vast</option></select><Button type="submit">{modelForm.id ? "Model bewaren" : "Model toevoegen"}</Button></form>
-        <ul className="divide-y border text-sm">{models.map((item) => <li key={item.id} className="flex items-center justify-between gap-2 px-3 py-2"><span>{item.manufacturer} {item.name} · {applicationLabels[item.application]}</span><span className="flex gap-1"><Button type="button" variant="ghost" size="icon" aria-label={`Bewerk model ${item.name}`} title={`Bewerk model ${item.name}`} onClick={() => setModelForm({ id: item.id, manufacturer: item.manufacturer, name: item.name, application: item.application })}><Pencil className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" aria-label={`Verwijder model ${item.name}`} title={`Verwijder model ${item.name}`} onClick={() => onRemove("model", item.id)}><Trash2 className="h-4 w-4 text-red-700" /></Button></span></li>)}</ul>
-      </section>
-      <section className="space-y-3"><h2 className="font-semibold">TEI-bereiken</h2><form onSubmit={(event) => void onSaveRange(event)} className="grid gap-2"><label className="sr-only" htmlFor="range-model">Radiomodel</label><select id="range-model" required className="flex h-10 border bg-white px-3 text-sm" value={rangeForm.model_id} onChange={(event) => setRangeForm({ ...rangeForm, model_id: event.target.value })}><option value="">Kies model</option>{models.map((item) => <option key={item.id} value={item.id}>{item.manufacturer} {item.name}</option>)}</select><label className="sr-only" htmlFor="range-start">Eerste TEI</label><Input id="range-start" required maxLength={15} value={rangeForm.start_tei} onChange={(event) => setRangeForm({ ...rangeForm, start_tei: event.target.value })} placeholder="Eerste TEI" /><label className="sr-only" htmlFor="range-end">Laatste TEI</label><Input id="range-end" required maxLength={15} value={rangeForm.end_tei} onChange={(event) => setRangeForm({ ...rangeForm, end_tei: event.target.value })} placeholder="Laatste TEI" /><Button type="submit">{rangeForm.id ? "Bereik bewaren" : "Bereik toevoegen"}</Button></form>
-        <ul className="divide-y border text-sm">{ranges.map((item) => <li key={item.id} className="flex items-center justify-between gap-2 px-3 py-2"><span className="min-w-0"><span className="block truncate">{item.model.manufacturer} {item.model.name}</span><span className="block font-mono text-xs text-muted-foreground">{item.start_tei} – {item.end_tei}</span></span><span className="flex gap-1"><Button type="button" variant="ghost" size="icon" aria-label={`Bewerk TEI-bereik ${item.start_tei}`} title={`Bewerk TEI-bereik ${item.start_tei}`} onClick={() => setRangeForm({ id: item.id, model_id: String(item.model.id), start_tei: item.start_tei, end_tei: item.end_tei })}><Pencil className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" aria-label={`Verwijder TEI-bereik ${item.start_tei}`} title={`Verwijder TEI-bereik ${item.start_tei}`} onClick={() => onRemove("range", item.id)}><Trash2 className="h-4 w-4 text-red-700" /></Button></span></li>)}</ul>
-      </section>
-      {error && <p role="alert" className="text-sm text-red-700 xl:col-span-3">{error}</p>}
-    </div>
-  </details>;
 }

@@ -26,7 +26,6 @@ def scan_client(db):
 def radio(db):
     return Radio.objects.create(
         tei="00000000000001",
-        application=Radio.Application.PORTABLE,
         fireplan_id=4321,
         fireplan_qr_url=QR_URL,
     )
