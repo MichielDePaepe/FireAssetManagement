@@ -154,8 +154,9 @@ describe("RadioManagementPage", () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByRole("tab", { name: "Abonnementen" }));
-    expect(screen.getAllByText("Actief").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Beëindigd").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Actief/).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("row")).toHaveLength(3);
+    expect(screen.getAllByText(/Looptijd:/)).toHaveLength(2);
   });
 
   it("opens the radio detail page after scanner identification", async () => {
@@ -163,7 +164,7 @@ describe("RadioManagementPage", () => {
     vi.mocked(api.lookupRadioScan).mockResolvedValue({ raw_scan: "sample scan", radio: sampleRadio });
     renderPage();
     await user.click(await screen.findByRole("button", { name: "Simuleer Radio scan" }));
-    expect(await screen.findByRole("heading", { name: "Radio 00000000000001" })).toBeInTheDocument();
+    await waitFor(() => expect(mockedNavigate).toHaveBeenCalledWith("/radios/7"));
     expect(api.assignRadioSubscription).not.toHaveBeenCalled();
     expect(api.updateRadioRelationship).not.toHaveBeenCalled();
   });
@@ -202,7 +203,7 @@ describe("RadioManagementPage", () => {
     mockedNavigate.mockClear();
     vi.mocked(api.startFireplanRadioSync).mockResolvedValue({ task_id: "radio-sync-1", status: "PENDING" });
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "Synchroniseer radio's met FirePlan" }));
+    await user.click(await screen.findByRole("button", { name: "Synchroniseer met FirePlan" }));
     await waitFor(() => expect(api.startFireplanRadioSync).toHaveBeenCalledOnce());
     expect(window.localStorage.getItem("activeFireplanSyncId")).toBe("radio-sync-1");
     expect(mockedNavigate).toHaveBeenCalledWith("/tasks/radio-sync-1");

@@ -10,8 +10,8 @@ from .views import (
     PagerViewSet,
     RadioModelViewSet,
     RadioScanLookupView,
-    RadioSubscriptionViewSet,
     RadioSubscriptionImportView,
+    RadioSubscriptionViewSet,
     RadioViewSet,
     RicCodeViewSet,
     TeiRangeViewSet,
@@ -32,6 +32,10 @@ router.register("ric-codes", RicCodeViewSet, basename="ric-code")
 urlpatterns = [
     path("pagers/scanlookup/", PagerScanLookupView.as_view(), name="pager-scanlookup"),
     path("radios/scanlookup/", RadioScanLookupView.as_view(), name="radio-scanlookup"),
-    path("radio-subscriptions/import/", RadioSubscriptionImportView.as_view(), name="radio-subscription-import"),
+    path(
+        "radio-subscriptions/import/",
+        RadioSubscriptionImportView.as_view(),
+        name="radio-subscription-import",
+    ),
 ]
 urlpatterns += router.urls

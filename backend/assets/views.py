@@ -203,7 +203,9 @@ class RadioSubscriptionImportView(APIView):
             if len(tei) != 15 or not all(character in "0123456789" for character in tei):
                 skipped += 1
                 invalid_rows = True
-                issues.append(f"Rij {row_number}: TEI moet na normalisatie precies 15 cijfers bevatten.")
+                issues.append(
+                    f"Rij {row_number}: TEI moet na normalisatie precies 15 cijfers bevatten."
+                )
                 continue
             if not issi_number:
                 skipped += 1
@@ -221,7 +223,10 @@ class RadioSubscriptionImportView(APIView):
         if invalid_rows:
             return Response(
                 {
-                    "detail": "Het CSV-bestand bevat ongeldige abonnementregels; er zijn geen wijzigingen toegepast.",
+                    "detail": (
+                        "Het CSV-bestand bevat ongeldige abonnementregels; "
+                        "er zijn geen wijzigingen toegepast."
+                    ),
                     "skipped": skipped,
                     "issues": issues[:20],
                 },
@@ -231,7 +236,9 @@ class RadioSubscriptionImportView(APIView):
         created_issis = 0
         ended_subscriptions = 0
         imported_at = timezone.now()
-        source_pairs = list(dict.fromkeys((tei, issi_number) for _, tei, issi_number in rows_with_pairs))
+        source_pairs = list(
+            dict.fromkeys((tei, issi_number) for _, tei, issi_number in rows_with_pairs)
+        )
         pair_row_numbers = {}
         for row_number, tei, issi_number in rows_with_pairs:
             pair_row_numbers.setdefault((tei, issi_number), row_number)
@@ -249,7 +256,11 @@ class RadioSubscriptionImportView(APIView):
                 radios_by_tei[tei] = radio
                 issis_by_number[issi_number] = issi
 
-            current = list(RadioSubscription.objects.filter(ended_at__isnull=True).select_related("radio", "issi"))
+            current = list(
+                RadioSubscription.objects.filter(ended_at__isnull=True).select_related(
+                    "radio", "issi"
+                )
+            )
             current_pairs = {(item.radio.tei, item.issi.issi) for item in current}
             selected_pairs = []
             used_teis = set()
@@ -273,7 +284,10 @@ class RadioSubscriptionImportView(APIView):
                 if tei in used_teis or issi_number in used_issis:
                     skipped += 1
                     row_number = pair_row_numbers[pair]
-                    issues.append(f"Rij {row_number}: conflicteert met een andere radio/ISSI-koppeling in het bestand.")
+                    issues.append(
+                        f"Rij {row_number}: conflicteert met een andere radio/ISSI-koppeling "
+                        "in het bestand."
+                    )
                     continue
                 selected_pairs.append(pair)
                 used_teis.add(tei)
@@ -285,7 +299,9 @@ class RadioSubscriptionImportView(APIView):
                 if (item.radio.tei, item.issi.issi) not in selected_set
             ]
             if ending_ids:
-                ended_subscriptions = RadioSubscription.objects.filter(pk__in=ending_ids).update(ended_at=imported_at)
+                ended_subscriptions = RadioSubscription.objects.filter(pk__in=ending_ids).update(
+                    ended_at=imported_at
+                )
 
             for tei, issi_number in selected_pairs:
                 if (tei, issi_number) in current_pairs:

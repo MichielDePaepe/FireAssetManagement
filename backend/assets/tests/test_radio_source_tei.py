@@ -72,7 +72,9 @@ def test_data_migration_normalizes_existing_fourteen_digit_values():
     assert tei_range.end_tei == "0" * 12 + "240"
 
 
-@pytest.mark.parametrize("value", ["1234567890123", "0" * 16, "0" * 17, "not-a-tei", "0" * 14 + "A"])
+@pytest.mark.parametrize(
+    "value", ["1234567890123", "0" * 16, "0" * 17, "not-a-tei", "0" * 14 + "A"]
+)
 def test_tei_rejects_non_decimal_or_unsupported_width(value):
     with pytest.raises(ValidationError):
         Radio(tei=value).full_clean()

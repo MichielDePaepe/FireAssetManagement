@@ -83,7 +83,10 @@ def test_radio_search_matches_model_fireplan_and_current_issi(staff_client):
     issi = Issi.objects.create(issi="7654321", alias="Search Alias")
     RadioSubscription.assign(radio, issi)
 
-    for query in ("00000000000004", "000000000000040", "ExampleBrand", "Model Search", "907654", "7654321"):
+    queries = (
+        "00000000000004", "000000000000040", "ExampleBrand", "Model Search", "907654", "7654321"
+    )
+    for query in queries:
         response = staff_client.get(reverse("radio-list"), {"search": query})
         assert response.status_code == 200
         assert [item["id"] for item in response.json()] == [radio.pk]
