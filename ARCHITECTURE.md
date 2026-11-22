@@ -44,6 +44,15 @@ All API routes are same-origin under `/api`. Vite proxies requests in developmen
 | GET, POST | `/api/pagers/` | List pagers or create a pager |
 | GET, PUT, PATCH, DELETE | `/api/pagers/{id}/` | Retrieve, edit, or delete a pager |
 | POST | `/api/pagers/scanlookup/` | Resolve a scanned Fireplan QR URL against complete stored pager URLs; authenticated |
+| GET, POST | `/api/radios/` | List or create radio assets; authenticated read, staff write |
+| GET, PUT, PATCH, DELETE | `/api/radios/{id}/` | Retrieve, edit, or delete a radio; FirePlan ID and QR URL are read-only |
+| POST | `/api/radios/scanlookup/` | Resolve a scanned FirePlan QR URL against stored radio URLs; authenticated |
+| GET, POST, PUT, PATCH, DELETE | `/api/issis/`, `/api/organizations/`, `/api/radio-models/`, `/api/tei-ranges/` | Read or manage radio reference records; authenticated read, staff write |
+| GET, POST | `/api/radio-subscriptions/` | Read subscription history or assign a current radio/ISSI pair; authenticated read, staff write |
+| POST | `/api/radio-subscriptions/import/` | Import ASTRID subscription CSV data as radio/ISSI history; staff only |
+| GET | `/api/inventory/radios/{id}/relationship/` | Read current radio placement and relationship history; authenticated |
+| PUT | `/api/inventory/radios/{id}/relationship/` | Replace or clear a radio placement; staff only |
+| POST | `/api/fireplan/sync-radios/` | Queue read-only FirePlan radio synchronization; staff only |
 | GET | `/api/pager-types/` | List configured pager types |
 | GET, POST | `/api/ric-codes/` | List or create standalone RiC/AdC code records |
 | GET, PUT, PATCH, DELETE | `/api/ric-codes/{id}/` | Retrieve, edit, or delete a RiC/AdC code record |
@@ -130,7 +139,23 @@ There is no cancellation API. Celery revoke without termination can prevent some
 
 ## Progress and SSE
 
-`celery-progress` records the current/total/percentage in Celery task metadata. The configured `django-celery-results` backend stores that metadata in PostgreSQL. SSE reads the same Celery snapshot and emits it when it changes. While a client is connected, Django checks the stored snapshot once per second; it does not write a second event log or broadcast topic. The per-connection query interval is intentionally simple for a starter and should be tuned for large numbers of simultaneous connections.
+`celery-progress` records the current/total/percentage in Celery task metadata. The configured `django-celery-results` backend stores that metadata in PostgreSQL. SSE reads the same Celery snapshot and emits it when it changes. While a client is connected, Django checks the stored snapshot once per second; it does not write a second event log or broadcast topic. The per-connection query interval is intentionally simple for a starter and should be tuned for large numbers of simultaneous connections. Radio sync uses the same Celery task ID, result backend, progress metadata, SSE stream, task detail, and report UI as the other tasks; its result includes added, updated, unchanged, skipped, and row errors.
+
+## Radio assets and relationships
+
+The `assets` app stores `Radio`, `Manufacturer`, `RadioModel`, `TeiRange`, `Issi`, `Organization`, and `RadioSubscription` in PostgreSQL. Radio has a one-to-one `inventory.ManagedObject(kind="radio")` identity. TEI is a unique text field. Fourteen-digit inputs are normalized by appending a trailing 0; only 15-digit TEIs are accepted after normalization. Leading zeros remain part of the string. Range comparisons use decimal TEI values. Matching TEI ranges assign a model, while unmatched TEIs remain valid without a model. Each radio model references a normalized manufacturer record through a protected foreign key. Staff select, add, or edit manufacturers from the radio model dialog. Range endpoints are inclusive and overlap is rejected. ISSI is a standalone unique text identifier with an alias and optional protected organization reference. Subscription assignment locks both records, closes any active row involving either record, and creates the new row; partial unique constraints enforce at most one active ISSI per radio and one active radio per ISSI.
+
+The staff-only **Beheer → Radiobeheer** page uses two tabs with searchable, sortable tables for organizations and radio models. Staff manage a model’s TEI ranges in its edit dialog. The `/radios` page provides the radio, ISSI, and subscription registers.
+
+On the radio device register, the Model column has a checkbox filter with the distinct model labels present in the radio inventory. Its filter state remains independent from the table search and sort state.
+
+The Abonnementen register shows the number of active subscriptions and sortable radio, ISSI, radio type, and date columns; alias and status columns are omitted. Rows show the start/end dates with the elapsed duration in years, months, and days. The radio type is resolved from the radio inventory's configured manufacturer and model or its text model fields.
+
+Staff can upload an ASTRID subscription CSV from the Abonnementen tab by browsing or dropping a file into the import dialog. The importer reads the first `BRAND` column along with `TEI` and `IDENTIFIER` (the ISSI); it ignores source dates and `SERIAL_NUMBER`, skips Spare Subscription rows without regard to case, normalizes 14-digit TEIs by appending `0`, accepts 15-digit values unchanged, and rejects other lengths. Missing radio and ISSI records are created, with a new ISSI's number used as its initial alias. The upload is reconciled as a snapshot at one captured timestamp: matching active links keep their original start, new links start at upload time, and active links absent from the file end at upload time. Invalid non-spare rows reject the import without changing history. Conflicting rows are skipped rather than silently replacing an existing one-to-one radio/ISSI assignment. The response reports skipped rows, new radio and ISSI records, and ended links.
+
+Radio placement history reuses `inventory.ManagedRelationship`. Staff choose a destination directly: vectors use `assigned_to`, vehicles use `mounted_in`, and CityGIS locations use `installed_in`. The relationship API's managed-object target IDs are `ManagedObject` IDs, not vector/vehicle table IDs. A radio has at most one current placement across these relationship types; changing destination closes the previous placement. An unchanged destination is idempotent; clearing ends the current row without creating an empty relationship. These assignments are separate from `PhysicalLocationObservation`.
+
+The staff-only `fireplan.sync_radios` Celery task reads paginated QR inventory through the existing authenticated FirePlan client and uses only the confirmed source names `Radio mobile Astrid` and `Radio portable Astrid`. `id`, `serialNumber`, and `qrCode` populate FirePlan ID, text TEI, and the full QR URL. Upsert matches by FirePlan ID first, then TEI. FirePlan fields cannot be edited through the management API, and synchronization does not delete local-only radios or write to FirePlan. `RadioScanLookup` shares the pager keyboard/camera scanner and QR candidate normalization; identification only selects and displays a radio. A live repeated fetch returned the same IDs and payload immediately; long-term ID stability has not been independently established.
 
 The browser uses native `EventSource`, which reconnects automatically. On every connection the stream immediately sends the latest snapshot, so reconnect does not require replaying an event log. The stream emits keep-alive comments every 15 seconds, disables Nginx response buffering, and closes after a terminal state. Navigating away closes only the SSE connection; it does not affect the Celery task. Refreshing the detail route retrieves the stored status and opens a new stream.
 

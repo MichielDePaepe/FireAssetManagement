@@ -2,17 +2,13 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type FormEvent,
-  type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import {
   ArrowDown,
   ArrowDownUp,
   ArrowUp,
-  CloudDownload,
   History,
   Pencil,
   Plus,
@@ -20,7 +16,6 @@ import {
   RotateCw,
   Search,
   Trash2,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
@@ -28,13 +23,15 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PagerScanControl } from "@/components/PagerScanControl";
+import { CloudRefreshIcon } from "@/components/CloudRefreshIcon";
+import { ModalDialog } from "@/components/ModalDialog";
 import { api, type Pager, type PagerType, type RicCode } from "@/lib/api";
 
 interface PagerFormState {
   serial_number: string;
   type_id: string;
 }
-
 const emptyForm: PagerFormState = { serial_number: "", type_id: "" };
 
 type SortDirection = "ascending" | "descending";
@@ -277,14 +274,15 @@ export function PagersPage() {
           {activeTab === "devices" && user?.is_staff && (
             <>
               <Button
-                size="sm"
+                variant="outline"
+                size="icon"
                 onClick={() => void startFireplanSync()}
                 disabled={syncing}
                 aria-label="Synchroniseer met Fireplan"
                 title="Synchroniseer met Fireplan"
+                className="h-9 w-9"
               >
-                <CloudDownload className={`h-4 w-4 ${syncing ? "animate-bounce" : ""}`} />
-                {syncing ? "Synchroniseren…" : "Fireplan sync"}
+                <CloudRefreshIcon syncing={syncing} />
               </Button>
               {activeSyncId && (
                 <Button variant="outline" size="sm" asChild>
@@ -313,12 +311,12 @@ export function PagersPage() {
             />
           </Button>
           {activeTab === "devices" ? (
-            <Button size="sm" onClick={openCreateForm} aria-label="Pager toevoegen">
-              <Plus className="h-4 w-4" />Nieuw toestel
+            <Button size="icon" onClick={openCreateForm} aria-label="Pager toevoegen" title="Nieuw toestel" className="h-9 w-9">
+              <Plus className="h-4 w-4" />
             </Button>
           ) : (
-            <Button size="sm" onClick={openNewCodeForm} aria-label="RiC-code toevoegen">
-              <Plus className="h-4 w-4" />Nieuwe RiC-code
+            <Button size="icon" onClick={openNewCodeForm} aria-label="RiC-code toevoegen" title="Nieuwe RiC-code" className="h-9 w-9">
+              <Plus className="h-4 w-4" />
             </Button>
           )}
         </div>
@@ -417,11 +415,21 @@ export function PagersPage() {
                 {pagers.length} {pagers.length === 1 ? "pager" : "pagers"} geregistreerd
               </CardDescription>
             </div>
-            <label className="relative w-full sm:w-72">
-              <span className="sr-only">Pagers zoeken</span>
-              <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" value={pagerQuery} onChange={(event) => setPagerQuery(event.target.value)} placeholder="Zoek pager of type" />
-            </label>
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+              <label className="relative min-w-48 flex-1 sm:w-72 sm:flex-none">
+                <span className="sr-only">Pagers zoeken</span>
+                <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input className="pl-9" value={pagerQuery} onChange={(event) => setPagerQuery(event.target.value)} placeholder="Zoek pager of type" />
+              </label>
+              <PagerScanControl onScan={async (raw) => {
+                try {
+                  const result = await api.scanPager(raw);
+                  setPagerQuery(result.pager.serial_number);
+                } catch (reason) {
+                  toast.error(reason instanceof Error ? reason.message : "Pager scannen is niet gelukt.");
+                }
+              }} />
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             {error ? (
@@ -661,94 +669,5 @@ export function PagersPage() {
         </ModalDialog>
       )}
     </div>
-  );
-}
-
-interface ModalDialogProps {
-  title: string;
-  onClose: () => void;
-  children: ReactNode;
-}
-
-function ModalDialog({ title, onClose, children }: ModalDialogProps) {
-  const dialogRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const previousFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialogRef.current?.querySelector<HTMLElement>("[autofocus]")?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab" || !dialogRef.current) return;
-
-      const focusable = Array.from(
-        dialogRef.current.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      );
-      if (focusable.length === 0) {
-        event.preventDefault();
-        return;
-      }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
-    };
-  }, [onClose]);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <section
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="asset-edit-dialog-title"
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto"
-      >
-        <Card>
-          <CardHeader className="flex-row items-center justify-between gap-4">
-            <CardTitle id="asset-edit-dialog-title">{title}</CardTitle>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Sluiten"
-              onClick={onClose}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>{children}</CardContent>
-        </Card>
-      </section>
-    </div>,
-    document.body,
   );
 }

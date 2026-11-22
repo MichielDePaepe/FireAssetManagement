@@ -5,14 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FireplanSyncReportDialog } from "@/components/FireplanSyncReportDialog";
 import { TaskProgress } from "@/components/TaskProgress";
-import { api, subscribeToTask, type FireplanSyncResult, type TaskSnapshot } from "@/lib/api";
+import { api, subscribeToTask, type FireplanRadioSyncResult, type FireplanSyncResult, type TaskSnapshot } from "@/lib/api";
 import { taskLabel } from "@/lib/taskPresentation";
 
-function fireplanResult(task: TaskSnapshot | null): FireplanSyncResult | null {
-  if (task?.task_name !== "fireplan.sync_pagers" || !task.result || !("unchanged" in task.result)) {
-    return null;
-  }
-  return task.result;
+function fireplanResult(task: TaskSnapshot | null): FireplanSyncResult | FireplanRadioSyncResult | null {
+  if (!task?.result || !("unchanged" in task.result)) return null;
+  if (task.task_name === "fireplan.sync_pagers" || task.task_name === "fireplan.sync_radios") return task.result;
+  return null;
 }
 
 export function TaskDetailPage() {

@@ -41,6 +41,7 @@ export function AppLayout() {
   const links = [
     { to: "/", label: "Dashboard", icon: Gauge, end: true },
     { to: "/pagers", label: "Pagers", icon: Radio, end: false },
+    { to: "/radios", label: "Radio's", icon: Radio, end: false },
   ];
 
   return (
@@ -79,6 +80,9 @@ export function AppLayout() {
                 <Building2 className="h-4 w-4" />Locaties
               </NavLink>
             </div>}
+            <NavLink to="/radiobeheer" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+              <Radio className="h-4 w-4" />Radiobeheer
+            </NavLink>
             <button type="button" aria-expanded={firePlanOpen} aria-controls="fireplan-links" onClick={() => setFirePlanOpen((open) => !open)} className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm ${pathname.startsWith("/fireplan") ? "font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
               <Radio className="h-4 w-4" />FirePlan<ChevronDown className={`ml-auto h-4 w-4 transition-transform ${firePlanOpen ? "rotate-180" : ""}`} />
             </button>

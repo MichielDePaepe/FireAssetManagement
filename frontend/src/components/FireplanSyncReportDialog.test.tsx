@@ -34,4 +34,14 @@ describe("FireplanSyncReportDialog", () => {
     await user.click(screen.getByRole("button", { name: "Rapport sluiten" }));
     expect(onClose).toHaveBeenCalledTimes(2);
   });
+
+  it("shows a radio synchronization report with skipped source rows", () => {
+    render(<FireplanSyncReportDialog report={{
+      added: 1, updated: 2, unchanged: 3, skipped: 4,
+      errors: [{ fireplan_id: 99, name: "Radio mobile Astrid", message: "TEI ontbreekt" }],
+    }} open onClose={vi.fn()} />);
+    expect(screen.getByText("Resultaat van de radiosynchronisatie.")).toBeInTheDocument();
+    expect(screen.getByText("Overgeslagen").parentElement).toHaveTextContent("4");
+    expect(screen.getByText("TEI ontbreekt")).toBeInTheDocument();
+  });
 });

@@ -140,4 +140,8 @@ services:
 
 volumes:
   postgres_data:
+    external: true
+    name: fire-asset-management_postgres_data
   redis_data:
+    external: true
+    name: fire-asset-management_redis_data

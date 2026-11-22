@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 TRACKED_TASK_NAMES = (
     "tasks.example_task",
     "fireplan.sync_pagers",
+    "fireplan.sync_radios",
     "fireplan.sync_inventories",
     "citygis.refresh",
 )

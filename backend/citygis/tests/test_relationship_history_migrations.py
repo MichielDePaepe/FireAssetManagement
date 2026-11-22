@@ -18,7 +18,8 @@ class CityGISRelationshipHistoryMigrationTests(TransactionTestCase):
         self.old_apps = self.migrate(self.migrate_from)
 
     def tearDown(self):
-        self.migrate(self.migrate_to)
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
 
     def test_populated_vectors_are_backfilled_without_guessing_effective_times(self):
         ManagedObject = self.old_apps.get_model("inventory", "ManagedObject")

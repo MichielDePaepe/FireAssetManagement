@@ -87,6 +87,29 @@ describe("FireplanTaskMonitor", () => {
     ));
   });
 
+  it("recognizes radio sync results and offers the task report", async () => {
+    localStorage.setItem("activeFireplanSyncId", "radio-sync-42");
+    vi.mocked(api.getTask).mockResolvedValue({
+      task_id: "radio-sync-42", task_name: "fireplan.sync_radios", status: "PROGRESS",
+      progress: null, result: null, error: null, updated_at: null,
+    });
+    let onUpdate: ((snapshot: TaskSnapshot) => void) | undefined;
+    vi.mocked(subscribeToTask).mockImplementation((_id, callback) => { onUpdate = callback; return vi.fn(); });
+    render(<MemoryRouter><FireplanTaskMonitor /><CurrentLocation /></MemoryRouter>);
+    await waitFor(() => expect(subscribeToTask).toHaveBeenCalledOnce());
+    act(() => onUpdate?.({
+      task_id: "radio-sync-42", task_name: "fireplan.sync_radios", status: "SUCCESS",
+      progress: { current: 1, total: 1, percent: 100 },
+      result: { message: "done", added: 1, updated: 2, unchanged: 3, skipped: 4, errors: [] },
+      error: null, updated_at: null,
+    }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledOnce());
+    const action = vi.mocked(toast.success).mock.calls[0][1]?.action;
+    if (!action || typeof action !== "object" || !("onClick" in action)) throw new Error("Expected report action.");
+    act(() => (action.onClick as () => void)());
+    expect(await screen.findByLabelText("Current location")).toHaveTextContent("/tasks/radio-sync-42?report=1");
+  });
+
   it("reloads the persisted result when the terminal SSE snapshot arrives before the result", async () => {
     localStorage.setItem("activeFireplanSyncId", "sync-race");
     const running = {

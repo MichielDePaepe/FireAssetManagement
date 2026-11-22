@@ -1,18 +1,23 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import status
-from rest_framework.permissions import IsAdminUser
+from rest_framework import serializers, status
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from assets.models import Pager, RicCode, RicCodeVectorRelationship
+from assets.models import Pager, Radio, RicCode, RicCodeVectorRelationship
 from assets.serializers import PagerSerializer, RicCodeSerializer
 from citygis.models import Location, Vector, VectorStatus
 from citygis.serializers import LocationSerializer, VectorSerializer
 
 from .models import ManagedObject, ManagedRelationship
-from .serializers import VectorAssignmentSerializer
+from .serializers import (
+    RadioRelationshipHistorySerializer,
+    RadioRelationshipSerializer,
+    VectorAssignmentSerializer,
+)
 
 
 class InventorySnapshotView(APIView):
@@ -114,3 +119,44 @@ class RicCodeVectorAssignmentView(APIView):
                     current.ended_at = timezone.now()
                     current.save(update_fields=["ended_at"])
         return Response({"vector_id": vector.pk if vector else None}, status=status.HTTP_200_OK)
+
+
+class RadioRelationshipView(APIView):
+    def get_permissions(self):
+        return [IsAdminUser() if self.request.method == "PUT" else IsAuthenticated()]
+
+    def get_radio(self, radio_id):
+        return get_object_or_404(Radio.objects.select_related("managed_object"), pk=radio_id)
+
+    def get(self, request, radio_id):
+        radio = self.get_radio(radio_id)
+        history = ManagedRelationship.objects.filter(source=radio.managed_object).select_related(
+            "target", "target_location"
+        )
+        rows = list(history)
+        current = next((row for row in rows if row.ended_at is None), None)
+        return Response(
+            {
+                "current": RadioRelationshipHistorySerializer(current).data if current else None,
+                "history": RadioRelationshipHistorySerializer(rows, many=True).data,
+            }
+        )
+
+    def put(self, request, radio_id):
+        radio = self.get_radio(radio_id)
+        serializer = RadioRelationshipSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        try:
+            if values["target"] is None and values["target_location"] is None:
+                ManagedRelationship.clear(radio.managed_object, values["kind"])
+            else:
+                ManagedRelationship.relate(
+                    radio.managed_object,
+                    values["kind"],
+                    target=values["target"],
+                    target_location=values["target_location"],
+                )
+        except (ValueError, DjangoValidationError, serializers.ValidationError) as error:
+            raise serializers.ValidationError({"detail": str(error)}) from error
+        return self.get(request, radio_id)

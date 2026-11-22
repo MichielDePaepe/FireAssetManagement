@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     InventorySnapshotView,
     PagerVectorAssignmentView,
+    RadioRelationshipView,
     RicCodeVectorAssignmentView,
 )
 
@@ -17,5 +18,10 @@ urlpatterns = [
         "inventory/ric-codes/<int:code_id>/vector/",
         RicCodeVectorAssignmentView.as_view(),
         name="inventory-ric-vector",
+    ),
+    path(
+        "inventory/radios/<int:radio_id>/relationship/",
+        RadioRelationshipView.as_view(),
+        name="inventory-radio-relationship",
     ),
 ]

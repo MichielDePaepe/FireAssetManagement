@@ -27,6 +27,19 @@ Use the following interaction for sortable and filterable tables:
 - Keep sort and filter state independent so users can use both together.
 - Preserve accessible state (`aria-expanded`, `aria-label`, and `aria-sort`) and keyboard dismissal. If another page needs the same behavior, reuse or extract the shared implementation instead of introducing a visually different table pattern.
 
+### Domain register page layout
+
+Use the **Pagers** page as the reference layout for searchable domain registers and their tabs (including radios and Radiobeheer):
+
+- Put page-level actions in a compact, right-aligned icon-button group at the upper-right of the page title row. Include accessible names and `title` helpers. Put the add action here, not inside the table panel.
+- Place the tabs directly below the title row. Each tab shows its own bordered panel.
+- At the top of each panel, show the panel title and item count on the left. Put search on the right. Add QR scan and camera controls beside search only when that register supports QR scanning.
+- Put the table immediately below the panel header. Its muted header background spans the full table width and follows the sortable-table rules above. Use row actions as compact icon-only buttons in the rightmost column. Add filters only when the user asks for filtering or the register has an established filtering requirement.
+- Create and edit records in a modal dialog. The top-level add button and each row's edit icon open the same form modal in create or edit mode. Do not place forms inline above or inside the table.
+- Reuse the shared `ModalDialog` component for create/edit dialogs. Keep the same page title, tabs, panel, search, and table hierarchy across tabs rather than inventing a separate layout for each register.
+- Manage radio manufacturers as foreign-key records from the radio model dialog: select an existing manufacturer, or open a small add/edit modal. Do not add a separate manufacturer tab.
+- Manage a radio model's TEI ranges in that model's edit dialog, with a table and add/edit/delete actions. Do not create a separate TEI range tab.
+
 ## Technology restrictions
 
 - Keep the approved React/Vite/TypeScript/Tailwind and Django/DRF/Uvicorn/PostgreSQL stack.
