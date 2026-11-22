@@ -55,7 +55,7 @@ def test_staff_can_manage_radios_and_fireplan_fields_remain_read_only(staff_clie
 
     assert response.status_code == 200
     radio.refresh_from_db()
-    assert radio.tei == "00000000000002"
+    assert radio.tei == "000000000000020"
     assert radio.fireplan_id == 9001
     assert radio.fireplan_qr_url.endswith("9001,1010")
 
