@@ -23,4 +23,5 @@ Gebruik `api.listLocations()`, `api.getCityGIS()`, `subscribeToCityGIS()` en `Ci
 - Replaced `DashboardPage.tsx` with the live post overview, fixed-layout table, status controls, per-cell expansion, connection state, retry and history dialog.
 - Added `DashboardPage.test.tsx` with four test-first scenarios; targeted Vitest and TypeScript checks pass.
 - User refinement after phase 30: Rest uses three columns, other asset groups two; no internal vector dividers, post sort names, or hyphens in empty cells. These refinements were implemented and verified in phase 31.
+- Post-close wording refinement: expansion controls now say only `Toon N extra` / `Minder tonen`, without repeating the post name; the dashboard component test checks both labels.
 - No backend, API, model, migration, dependency or sync changes were needed.

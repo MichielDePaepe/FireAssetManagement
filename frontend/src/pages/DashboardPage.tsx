@@ -42,13 +42,11 @@ function VectorStatus({ vector, knownStatusCodes, onOpen }: { vector: CityGISVec
 }
 
 function AssetCell({
-  postName,
   vectors,
   columns,
   knownStatusCodes,
   onStatus,
 }: {
-  postName: string;
   vectors: CityGISVector[];
   columns: number;
   knownStatusCodes: Set<string>;
@@ -69,7 +67,7 @@ function AssetCell({
         className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
-      >{expanded ? <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" /> : <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />}{expanded ? `Minder tonen · ${postName}` : `Toon ${hiddenCount} extra · ${postName}`}</button>}
+      >{expanded ? <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" /> : <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />}{expanded ? "Minder tonen" : `Toon ${hiddenCount} extra`}</button>}
     </>
   </div>;
 }
@@ -171,7 +169,7 @@ export function DashboardPage() {
                     <span className="block whitespace-normal break-words">{row.location.name}</span>
                   </th>
                   {GROUPS.map(({ key, columns }) => <td key={key} className="px-2 py-2 align-top">
-                    <AssetCell postName={row.location.name} vectors={row.groups[key]} columns={columns} knownStatusCodes={knownStatusCodes} onStatus={setHistoryVector} />
+                    <AssetCell vectors={row.groups[key]} columns={columns} knownStatusCodes={knownStatusCodes} onStatus={setHistoryVector} />
                   </td>)}
                 </tr>)}
                 {rows.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">Er zijn nog geen posten om weer te geven.</td></tr>}

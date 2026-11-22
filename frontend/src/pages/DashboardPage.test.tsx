@@ -98,8 +98,11 @@ describe("DashboardPage", () => {
     const ambCell = within(row).getByRole("cell", { name: /AMB/ });
     for (const vehicle of ["A1", "A2", "A3", "A4", "A5", "A6"]) expect(within(ambCell).getByText(vehicle)).toBeInTheDocument();
     expect(within(ambCell).queryByText("A7")).not.toBeInTheDocument();
-    await user.click(within(ambCell).getByRole("button", { name: /Toon/ }));
+    const expandButton = within(ambCell).getByRole("button", { name: /Toon/ });
+    expect(expandButton).toHaveTextContent(/^Toon 1 extra$/);
+    await user.click(expandButton);
     expect(within(ambCell).getByText("A7")).toBeInTheDocument();
+    expect(within(ambCell).getByRole("button", { name: /Minder tonen/ })).toHaveTextContent(/^Minder tonen$/);
   });
 
   it("opens status history for the clicked vector", async () => {
