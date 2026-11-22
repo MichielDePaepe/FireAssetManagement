@@ -10,5 +10,5 @@ FROM base AS development
 RUN pip install --no-cache-dir -r requirements-dev.txt
 
 FROM base AS production
-RUN addgroup --system app && adduser --system --ingroup app app && chown -R app:app /app
+RUN addgroup --system app && adduser --system --ingroup app app && mkdir -p /app/staticfiles && chown -R app:app /app
 USER app
