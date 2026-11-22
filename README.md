@@ -32,7 +32,7 @@ docker compose --profile monitoring up -d flower
 
 Set non-empty `FLOWER_USER` and `FLOWER_PASSWORD` before enabling it. Use an SSH tunnel to view it remotely. For HTTPS, `make prod-https` adds the optional Caddy proxy. Its host ports default to 8082 and 8444; set `HTTP_PORT` and `HTTPS_PORT` in `.env` to change them. Set `HTTPS_DOMAIN` to a DNS name that resolves to the server and `ACME_EMAIL`; normal public certificates require the domain and ports to be reachable by the certificate authority. For a LAN-only deployment, Caddy can issue a private certificate with `tls internal`, but each client device must trust Caddy's root certificate. Enable `DJANGO_SECURE_COOKIES=true` when the app is accessed through HTTPS. Keep it false for the default HTTP LAN deployment. Assign unique values to `APP_PORT`, `HTTP_PORT`, and `HTTPS_PORT` when running multiple production checkouts on the same computer.
 
-The app container uses Nginx to serve the compiled single-page application and proxy API/SSE requests to Django. This is the HTTP application entry point. Caddy is only needed when TLS termination is desired.
+The app container uses Nginx to serve the compiled single-page application and proxy API/SSE requests to Django. At API startup, Django runs `collectstatic` into a Compose volume, which Nginx serves under `/static/` for Django admin. The volume contains public static assets only. This is the HTTP application entry point. Caddy is only needed when TLS termination is desired.
 
 ## Project customization
 

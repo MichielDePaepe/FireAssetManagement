@@ -14,10 +14,12 @@ flowchart LR
   API -->|status snapshots and SSE| Database
   API -->|encrypted Fireplan credentials and cookies| Database
   API -->|printer configuration| Database
+  API -->|collectstatic| DjangoStatic[(Django static volume)]
+  DjangoStatic -->|/static/| Web
   Flower[Flower monitoring] -. inspect broker .-> Redis
 ```
 
-Vite serves the development UI and proxies `/api` to Django. Production builds the UI to static assets and serves them with Nginx. Nginx routes `/api/` and `/admin/` to Uvicorn and serves SPA routes with the static app. An optional Caddy overlay terminates HTTPS; the default production port is plain HTTP for trusted local networks.
+Vite serves the development UI and proxies `/api` to Django. Production builds the UI to static assets and serves them with Nginx. At API startup, Django collects its admin static files into a shared Compose volume; Nginx serves that volume at `/static/`. Nginx routes `/api/` and `/admin/` to Uvicorn and serves SPA routes with the static app. An optional Caddy overlay terminates HTTPS; the default production port is plain HTTP for trusted local networks.
 
 ## Technology choices
 
