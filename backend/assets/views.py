@@ -68,7 +68,7 @@ class RadioViewSet(viewsets.ModelViewSet):
             Q(tei__icontains=query)
             | Q(manufacturer__icontains=query)
             | Q(model_name__icontains=query)
-            | Q(model__manufacturer__icontains=query)
+            | Q(model__manufacturer__name__icontains=query)
             | Q(model__name__icontains=query)
             | Q(fireplan_qr_url__icontains=query)
             | Q(subscription_history__issi__issi__icontains=query)

@@ -14,7 +14,15 @@ from .models import (
     RicCode,
     TeiRange,
     _tei_numeric_value,
+    normalize_tei,
 )
+
+
+def _validated_tei(value: str) -> str:
+    normalized = normalize_tei(value.strip())
+    if len(normalized) != 15 or not normalized.isascii() or not normalized.isdecimal():
+        raise serializers.ValidationError("Een TEI bevat 14 of 15 cijfers.")
+    return normalized
 
 
 class ManufacturerNameField(serializers.Field):
@@ -109,6 +117,8 @@ class RadioModelManagementSerializer(serializers.ModelSerializer):
 
 
 class TeiRangeSerializer(serializers.ModelSerializer):
+    start_tei = serializers.CharField(max_length=15)
+    end_tei = serializers.CharField(max_length=15)
     model = RadioModelManagementSerializer(read_only=True)
     model_id = serializers.PrimaryKeyRelatedField(
         source="model", queryset=RadioModel.objects.all(), write_only=True
@@ -118,6 +128,12 @@ class TeiRangeSerializer(serializers.ModelSerializer):
         model = TeiRange
         fields = ["id", "model", "model_id", "start_tei", "end_tei"]
         read_only_fields = ["id"]
+
+    def validate_start_tei(self, value):
+        return _validated_tei(value)
+
+    def validate_end_tei(self, value):
+        return _validated_tei(value)
 
     def validate(self, attrs):
         model = attrs.get("model", getattr(self.instance, "model", None))
@@ -167,6 +183,7 @@ class RadioSubscriptionSerializer(serializers.ModelSerializer):
 
 
 class RadioManagementSerializer(serializers.ModelSerializer):
+    tei = serializers.CharField(max_length=15)
     managed_object = ManagedObjectIdentitySerializer(read_only=True)
     model = RadioModelManagementSerializer(read_only=True)
     model_id = serializers.PrimaryKeyRelatedField(
@@ -187,6 +204,9 @@ class RadioManagementSerializer(serializers.ModelSerializer):
             "id", "fireplan_id", "fireplan_qr_url", "created_at", "updated_at",
             "current_subscription", "subscription_history",
         ]
+
+    def validate_tei(self, value):
+        return _validated_tei(value)
 
     def get_current_subscription(self, instance):
         subscription = (
