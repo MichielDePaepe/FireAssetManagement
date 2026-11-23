@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api, type CityGISSnapshot, type RadioModel } from "@/lib/api";
+import { api, type CityGISSnapshot, type FireplanRadioInventoryPage, type RadioModel } from "@/lib/api";
 import { RadioManagementPage } from "@/pages/RadioManagementPage";
 import { RadioDetailPage } from "@/pages/RadioDetailPage";
 
@@ -24,7 +24,7 @@ vi.mock("@/lib/api", () => ({
     listRadioModels: vi.fn(), createRadioModel: vi.fn(), listTeiRanges: vi.fn(), createTeiRange: vi.fn(),
     listRadioSubscriptions: vi.fn(), assignRadioSubscription: vi.fn(),
     lookupRadioScan: vi.fn(), startFireplanRadioSync: vi.fn(),
-    getRadioRelationship: vi.fn(), updateRadioRelationship: vi.fn(), getCityGIS: vi.fn(), listLocations: vi.fn(),
+    getRadioRelationship: vi.fn(), getRadioFireplanInventories: vi.fn(), updateRadioRelationship: vi.fn(), getCityGIS: vi.fn(), listLocations: vi.fn(),
   },
 }));
 
@@ -53,13 +53,22 @@ const sampleRadio = {
       ended_at: null,
     },
   ],
-  fireplan_inventories: [
-    {
-      uuid: "inventory-2026-11",
-      source_closed_at: "2026-11-20T09:00:00Z",
-      vehicle: { alphacode: "AMB-701", fireplan_id: 701 },
-      vector: { vector_code: "V-701", name: "Ploeg 701", abbreviation: "P701" },
-    },
+};
+const inventoryHistoryPage: FireplanRadioInventoryPage = {
+  count: 12,
+  page: 1,
+  page_size: 10,
+  results: [
+    { uuid: "inventory-2026-11-20", source_closed_at: "2026-11-20T09:00:00Z", vehicle: { alphacode: "AMB-701", fireplan_id: 701 }, vector: { vector_code: "V-701", name: "Ploeg 701", abbreviation: "P701" } },
+    { uuid: "inventory-2026-11-19", source_closed_at: "2026-11-19T09:00:00Z", vehicle: { alphacode: "AMB-701", fireplan_id: 701 }, vector: { vector_code: "V-701", name: "Ploeg 701", abbreviation: "P701" } },
+  ],
+};
+const inventoryHistoryPageTwo: FireplanRadioInventoryPage = {
+  count: 12,
+  page: 2,
+  page_size: 10,
+  results: [
+    { uuid: "inventory-2026-11-10", source_closed_at: "2026-11-10T09:00:00Z", vehicle: null, vector: null },
   ],
 };
 const sampleIssi = {
@@ -90,6 +99,9 @@ describe("RadioManagementPage", () => {
     authState.isStaff = true;
     vi.mocked(api.listRadios).mockResolvedValue([sampleRadio]);
     vi.mocked(api.getRadio).mockResolvedValue(sampleRadio);
+    vi.mocked(api.getRadioFireplanInventories).mockImplementation(async (_id, page = 1) =>
+      page === 1 ? inventoryHistoryPage : inventoryHistoryPageTwo,
+    );
     vi.mocked(api.listIssis).mockResolvedValue([sampleIssi]);
     vi.mocked(api.listOrganizations).mockResolvedValue([{ id: 3, name: "Brandweer Brussel" }]);
     vi.mocked(api.listRadioModels).mockResolvedValue([sampleRadio.model]);
@@ -112,15 +124,28 @@ describe("RadioManagementPage", () => {
     expect(screen.queryByLabelText("FirePlan-ID")).not.toBeInTheDocument();
   });
 
-  it("shows linked FirePlan inventories and their vehicle and vector", async () => {
+  it("shows the latest inventory first and expands older records with pagination", async () => {
+    const user = userEvent.setup();
     renderPage("/radios/7");
 
     expect(await screen.findByRole("heading", { name: "FirePlan-inventarissen" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "20 nov 2026, 09:00" })).toHaveAttribute(
-      "href",
-      "/fireplan/inventories/inventory-2026-11",
-    );
+    expect(screen.getByRole("status", { name: "Radio actief" })).toHaveTextContent("Actief");
+    expect(await screen.findByRole("link", { name: "20 nov 2026, 10:00" })).toHaveAttribute("href", "/fireplan/inventories/inventory-2026-11-20");
     expect(screen.getByText("AMB-701 · V-701 · Ploeg 701")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "19 nov 2026, 10:00" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Toon oudere inventarissen (11)" }));
+    expect(screen.getByRole("link", { name: "19 nov 2026, 10:00" })).toHaveAttribute("href", "/fireplan/inventories/inventory-2026-11-19");
+    await user.click(screen.getByRole("button", { name: "Volgende pagina" }));
+    expect(await screen.findByRole("link", { name: "10 nov 2026, 10:00" })).toHaveAttribute("href", "/fireplan/inventories/inventory-2026-11-10");
+    expect(screen.getByRole("link", { name: "20 nov 2026, 10:00" })).toBeInTheDocument();
+  });
+
+  it("shows radio subscription status at a glance", async () => {
+    vi.mocked(api.getRadio).mockResolvedValue({ ...sampleRadio, current_subscription: null });
+    renderPage("/radios/7");
+
+    expect(await screen.findByText("Inactief")).toBeInTheDocument();
   });
 
   it("keeps an accessible loading state until the module data arrives", () => {

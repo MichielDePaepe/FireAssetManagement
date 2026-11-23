@@ -1,6 +1,7 @@
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Braces, Radio as RadioIcon, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { ModalDialog } from "@/components/ModalDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, type FireplanInventoryDetail } from "@/lib/api";
@@ -13,12 +14,35 @@ function formatDateTime(value: string | null): string {
     : new Intl.DateTimeFormat("nl-BE", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
+function displayTei(value: string): string {
+  return /^[0-9]{14}$/.test(value) ? `${value}0` : value;
+}
+
 function DetailField({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-1">
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="break-words text-sm">{value || "Onbekend"}</dd>
     </div>
+  );
+}
+
+function RadioAssetLink({ radio }: { radio: { id: number; tei: string; issi_alias: string | null; is_active: boolean } }) {
+  return (
+    <Link
+      to={`/radios/${radio.id}`}
+      aria-label={`${radio.issi_alias || "Radioasset"} ${radio.tei}, ${radio.is_active ? "actief" : "niet actief"}`}
+      className="group flex min-w-0 items-center gap-2 border border-transparent px-2 py-1.5 transition-colors hover:border-border hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center ${radio.is_active ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+        <RadioIcon aria-hidden="true" className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{radio.issi_alias || "Radioasset"}</span>
+        <span className="block truncate font-mono text-xs text-muted-foreground">{radio.tei}</span>
+      </span>
+      <ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
+    </Link>
   );
 }
 
@@ -30,6 +54,10 @@ export function FireplanInventoryDetailPage() {
   const [error, setError] = useState("");
   const [syncStartError, setSyncStartError] = useState("");
   const [startingSync, setStartingSync] = useState(false);
+  const [selectedObservationJson, setSelectedObservationJson] = useState<{
+    itemId: string;
+    data: unknown;
+  } | null>(null);
 
   const startSync = async () => {
     setSyncStartError("");
@@ -140,17 +168,33 @@ export function FireplanInventoryDetailPage() {
               {inventory.radio_observations.length ? (
                 <div className="overflow-x-auto">
                   <table className="w-full table-fixed border-collapse text-left text-sm">
-                    <colgroup><col className="w-[30%]" /><col className="w-[20%]" /><col className="w-[30%]" /><col className="w-[20%]" /></colgroup>
+                    <colgroup><col className="w-[22%]" /><col className="w-[12%]" /><col className="w-[22%]" /><col className="w-[38%]" /><col className="w-[6%]" /></colgroup>
                     <thead className="border-b bg-muted/70 text-xs font-medium text-muted-foreground">
-                      <tr><th scope="col" className="px-3 py-3">FirePlan-item-ID</th><th scope="col" className="px-3 py-3">Itemtype</th><th scope="col" className="px-3 py-3">TEI</th><th scope="col" className="px-3 py-3">FAM-radio</th></tr>
+                      <tr><th scope="col" className="px-3 py-3">FirePlan-item-ID</th><th scope="col" className="px-3 py-3">Itemtype</th><th scope="col" className="px-3 py-3">TEI</th><th scope="col" className="px-3 py-3">Asset</th><th scope="col" className="px-1 py-3 text-center">JSON</th></tr>
                     </thead>
                     <tbody className="divide-y">
                       {inventory.radio_observations.map((observation) => (
                         <tr key={observation.fireplan_item_id}>
                           <td className="break-all px-3 py-3">{observation.fireplan_item_id}</td>
                           <td className="px-3 py-3">{observation.item_type_id}</td>
-                          <td className="break-all px-3 py-3 font-mono">{observation.serial_number}</td>
-                          <td className="break-all px-3 py-3">{observation.radio ? <Link className="underline underline-offset-4" to={`/radios/${observation.radio.id}`}>{observation.radio.tei}</Link> : <span className="text-muted-foreground">Niet gekoppeld</span>}</td>
+                          <td className="break-all px-3 py-3 font-mono">{displayTei(observation.serial_number)}</td>
+                          <td className="px-2 py-2">{observation.radio ? <RadioAssetLink radio={observation.radio} /> : <span className="inline-flex items-center gap-2 px-2 text-sm text-muted-foreground"><RadioIcon aria-hidden="true" className="h-4 w-4 opacity-50" />Niet gekoppeld</span>}</td>
+                          <td className="px-1 py-2 text-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-none"
+                              title={`Ruwe JSON bekijken voor ${observation.fireplan_item_id}`}
+                              aria-label={`Ruwe JSON bekijken voor ${observation.fireplan_item_id}`}
+                              onClick={() => setSelectedObservationJson({
+                                itemId: observation.fireplan_item_id,
+                                data: inventory.radio_items.find((item) => item.fireplan_item_id === observation.fireplan_item_id) ?? observation,
+                              })}
+                            >
+                              <Braces aria-hidden="true" className="h-4 w-4" />
+                            </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -160,14 +204,11 @@ export function FireplanInventoryDetailPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-none">
-            <CardHeader><CardTitle>Opgeslagen radio-JSON</CardTitle></CardHeader>
-            <CardContent>
-              <pre className="overflow-x-auto border bg-muted/40 p-4 text-xs leading-relaxed">{JSON.stringify(inventory.radio_items, null, 2)}</pre>
-            </CardContent>
-          </Card>
         </>
       ) : null}
+    {selectedObservationJson && <ModalDialog title={`Radio-observatie · ${selectedObservationJson.itemId}`} onClose={() => setSelectedObservationJson(null)}>
+      <pre className="max-h-[60vh] overflow-auto border bg-muted/40 p-4 text-xs leading-relaxed">{JSON.stringify(selectedObservationJson.data, null, 2)}</pre>
+    </ModalDialog>}
     </div>
   );
 }

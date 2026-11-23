@@ -1,3 +1,4 @@
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, inline_serializer
@@ -5,6 +6,8 @@ from rest_framework import serializers, status
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from assets.models import RadioSubscription
 
 from .client import (
     FireplanInventoryError,
@@ -322,7 +325,14 @@ class FireplanInventoryDetailView(APIView):
     def get(self, request, inventory_uuid):
         inventory = get_object_or_404(
             FireplanInventory.objects.select_related("vehicle", "vector").prefetch_related(
-                "radio_observations__radio"
+                "radio_observations__radio",
+                Prefetch(
+                    "radio_observations__radio__subscription_history",
+                    queryset=RadioSubscription.objects.filter(ended_at__isnull=True).select_related(
+                        "issi"
+                    ),
+                    to_attr="active_fireplan_subscriptions",
+                ),
             ),
             uuid=inventory_uuid,
             last_successful_sync_at__isnull=False,
@@ -372,7 +382,16 @@ class FireplanInventoryDetailView(APIView):
                         "item_type_id": observation.item_type_id,
                         "serial_number": observation.serial_number,
                         "radio": (
-                            {"id": observation.radio_id, "tei": observation.radio.tei}
+                            {
+                                "id": observation.radio_id,
+                                "tei": observation.radio.tei,
+                                "issi_alias": (
+                                    observation.radio.active_fireplan_subscriptions[0].issi.alias
+                                    if observation.radio.active_fireplan_subscriptions
+                                    else None
+                                ),
+                                "is_active": bool(observation.radio.active_fireplan_subscriptions),
+                            }
                             if observation.radio_id
                             else None
                         ),

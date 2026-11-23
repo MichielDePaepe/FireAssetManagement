@@ -34,6 +34,14 @@ Set non-empty `FLOWER_USER` and `FLOWER_PASSWORD` before enabling it. Use an SSH
 
 The app container uses Nginx to serve the compiled single-page application and proxy API/SSE requests to Django. At API startup, Django runs `collectstatic` into a Compose volume, which Nginx serves under `/static/` for Django admin. The volume contains public static assets only. This is the HTTP application entry point. Caddy is only needed when TLS termination is desired.
 
+To update a production server from Git, keep a clone of this repository on the server, configure its production `.env`, and make sure the deployment account can connect over SSH and run Docker Compose. From a checkout with SSH access to that server, run:
+
+```sh
+make deploy DEPLOY_HOST=deploy@server DEPLOY_PATH=/srv/fire-asset-management DEPLOY_BRANCH=main
+```
+
+`DEPLOY_HOST` and `DEPLOY_PATH` are required; `DEPLOY_BRANCH` defaults to `main`. The target checks that the server checkout has no uncommitted tracked changes and that its `.env` exists. It then fetches and fast-forwards the selected branch before running `docker compose up --build -d`. The production Compose configuration applies database migrations when the API starts. Keep production secrets and persistent-volume setup on the server; they are not fetched from Git.
+
 ## Project customization
 
 Run the template setup script once after creating a repository from this GitHub template:
@@ -58,6 +66,7 @@ After pushing the code to GitHub, enable **Settings → General → Template rep
 | `make dev` | Start the complete development environment with hot reload |
 | `make prod` | Start the production HTTP stack |
 | `make prod-https` | Add optional Caddy HTTPS; requires DNS and certificate configuration |
+| `make deploy DEPLOY_HOST=... DEPLOY_PATH=...` | Fetch the selected Git branch and update production Compose services over SSH |
 | `make stop` | Stop services and retain database and Redis data |
 | `make logs` | Follow service logs |
 | `make test` | Run backend and frontend tests |
@@ -148,7 +157,9 @@ By default, HTTPS validates both the certificate chain and the hostname. For an 
 
 The backend keeps the limited Fireplan inventory extraction map in `backend/fireplan/inventory_mapping.yaml`. It selects `Cabine de conduite` by its exact French name, then selects `Radio portable Astrid` by item type ID `1010`; container UUIDs are resolved from each inventory response. Fireplan timestamps without an offset are interpreted as `Europe/Brussels`. The backend uses PyYAML because Python's standard library does not parse YAML; see [Fireplan inventory dependency notes](docs/fireplan-inventory-dependencies.md).
 
-Staff can open **Beheer → FirePlan-inventarissen** to review paginated FirePlan summaries and their FAM synchronization status, including inventories not yet stored locally. The table shows the stored vector for synchronized inventories and reconstructs it from `VectorVehicleHistory` at the inventory time for unsynchronized rows; missing history is shown as unknown. The list fetches summary data only. Click a successfully synchronized inventory to inspect its locally stored metadata, radio observations, and formatted radio JSON. Its sync button reprocesses only that UUID and opens the existing task progress page; a failed refresh keeps the previous successful snapshot. Choose an inclusive start and end date to queue a manual reprocessing task for all inventories in that period. Follow progress and review added, updated, skipped, failed, and per-inventory errors on the existing task detail page. FirePlan `updatedAt` has not been confirmed as a reliable signal for edits to closed inventories, so hourly synchronization does not download every inventory's details.
+Staff can open **Beheer → FirePlan-inventarissen** to review paginated FirePlan summaries and their FAM synchronization status, including inventories not yet stored locally. The table shows the stored vector for synchronized inventories and reconstructs it from `VectorVehicleHistory` at the inventory time for unsynchronized rows; missing history is shown as unknown. The list fetches summary data only. Click a successfully synchronized inventory to inspect its locally stored metadata and radio observations. Each observation has a JSON action that opens its raw FirePlan item in a modal. A matched observation links to its FAM radio, showing the ISSI alias and TEI; its radio icon is green when a subscription is active and red when it is inactive. Unmatched source items remain visible without a link. Radio details show the latest linked inventory with its date and available vehicle/vector information; older rows expand on demand and load in server-paginated pages. The latest subscription is shown below radio details with a green active or red inactive indicator; older subscription history is collapsible. Matching uses the FirePlan serial as a TEI: 14 digits gain a trailing zero for comparison, 15 digits stay unchanged, and the original source text is retained. A later successful inventory sync can match an item after its radio is registered; a failed refresh keeps the previous successful snapshot and its links. The inventory sync button reprocesses only that UUID and opens the existing task progress page. Choose an inclusive start and end date to queue a manual reprocessing task for all inventories in that period. Follow progress and review added, updated, skipped, failed, and per-inventory errors on the existing task detail page. FirePlan `updatedAt` has not been confirmed as a reliable signal for edits to closed inventories, so hourly synchronization does not download every inventory's details.
+
+Large date-range inventory syncs use their own Celery limits, defaulting to 30 minutes soft and 31 minutes hard. Completed inventory records are saved as the task processes them, so reaching the limit does not roll back earlier completed records. Set `CELERY_FIREPLAN_INVENTORY_TASK_SOFT_TIME_LIMIT` and `CELERY_FIREPLAN_INVENTORY_TASK_TIME_LIMIT` in `.env` to tune these limits; keep the hard limit above the soft limit.
 
 ## CityGIS
 

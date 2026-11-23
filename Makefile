@@ -1,7 +1,10 @@
 COMPOSE = docker compose
 DEV_COMPOSE = $(COMPOSE) --profile monitoring -f compose.yaml -f compose.dev.yaml
+DEPLOY_HOST ?=
+DEPLOY_PATH ?=
+DEPLOY_BRANCH ?= main
 
-.PHONY: dev prod prod-https stop logs test lint migrate shell clean help
+.PHONY: dev prod prod-https deploy stop logs test lint migrate shell clean help
 
 help:
 	@awk 'BEGIN {FS = ":.*##"}; /^[a-zA-Z_-]+:.*##/ {printf "%-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -20,6 +23,11 @@ prod-https: ## Add Caddy HTTPS; requires HTTPS_DOMAIN, ACME_EMAIL, and reachable
 	@test -f .env || (echo "Create .env and configure HTTPS_DOMAIN and ACME_EMAIL first." && exit 1)
 	@python3 -c "from pathlib import Path; v=dict(line.strip().split('=',1) for line in Path('.env').read_text().splitlines() if '=' in line and not line.lstrip().startswith('#')); assert v.get('HTTPS_DOMAIN') and v.get('ACME_EMAIL')" || (echo "Set HTTPS_DOMAIN and ACME_EMAIL in .env first." && exit 1)
 	$(COMPOSE) -f compose.yaml -f compose.https.yaml up --build -d
+
+deploy: ## Update a production server from Git and rebuild its Compose services
+	@test -n "$(DEPLOY_HOST)" || (echo "Set DEPLOY_HOST (for example deploy@server)." && exit 1)
+	@test -n "$(DEPLOY_PATH)" || (echo "Set DEPLOY_PATH to the production checkout directory." && exit 1)
+	ssh "$(DEPLOY_HOST)" 'set -eu; cd "$(DEPLOY_PATH)"; test -f .env || (echo "Missing production .env in $(DEPLOY_PATH)." >&2; exit 1); test -z "$$(git status --porcelain)" || (echo "Production checkout has local changes; commit or discard them before deploying." >&2; exit 1); git fetch origin "$(DEPLOY_BRANCH)"; git checkout "$(DEPLOY_BRANCH)"; git pull --ff-only origin "$(DEPLOY_BRANCH)"; docker compose up --build -d'
 
 stop: ## Stop containers without removing persistent data
 	$(COMPOSE) -f compose.yaml -f compose.dev.yaml down

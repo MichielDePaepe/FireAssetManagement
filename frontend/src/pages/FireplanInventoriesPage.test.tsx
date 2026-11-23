@@ -92,7 +92,8 @@ const inventoryDetail: FireplanInventoryDetail = {
   last_error: "FirePlan tijdelijk onbeschikbaar",
   radio_items: [{ fireplan_item_id: "item-1", serial_number: "00001234" }],
   radio_observations: [
-    { fireplan_item_id: "item-1", item_type_id: 1010, serial_number: "00001234", radio: { id: 5, tei: "00000000000005" } },
+    { fireplan_item_id: "item-1", item_type_id: 1010, serial_number: "12345678901234", radio: { id: 5, tei: "123456789012340", issi_alias: "Ploeg Alfa", is_active: true } },
+    { fireplan_item_id: "item-2", item_type_id: 1010, serial_number: "987654321098765", radio: { id: 6, tei: "987654321098765", issi_alias: null, is_active: false } },
     { fireplan_item_id: "item-unmatched", item_type_id: 1010, serial_number: "unmatched-value", radio: null },
   ],
 };
@@ -151,7 +152,7 @@ describe("FireplanInventoriesPage", () => {
     expect(screen.queryByRole("link", { name: /AMB-1/ })).not.toBeInTheDocument();
   });
 
-  it("opens the local snapshot and formats the stored radio JSON", async () => {
+  it("opens the local snapshot and shows each observation's raw radio JSON in a modal", async () => {
     const user = userEvent.setup();
     renderPage();
 
@@ -160,11 +161,18 @@ describe("FireplanInventoriesPage", () => {
     expect(await screen.findByRole("heading", { name: "FirePlan-inventaris" })).toBeInTheDocument();
     expect(api.getFireplanInventoryDetail).toHaveBeenCalledWith("inv-synced");
     expect(screen.getByRole("alert")).toHaveTextContent("FirePlan tijdelijk onbeschikbaar");
-    expect(screen.getByText(/"serial_number": "00001234"/)).toBeInTheDocument();
+    expect(screen.queryByText(/"serial_number": "00001234"/)).not.toBeInTheDocument();
     expect(screen.getByText("V-LOCAL")).toBeInTheDocument();
-    expect(screen.getByText("00001234")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "00000000000005" })).toHaveAttribute("href", "/radios/5");
+    expect(screen.getAllByText("123456789012340")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: /Ploeg Alfa/ })).toHaveAttribute("href", "/radios/5");
+    const activeRadioIcon = screen.getByRole("link", { name: /Ploeg Alfa/ }).querySelector("svg.lucide-radio")?.parentElement;
+    expect(activeRadioIcon).toHaveClass("text-emerald-700");
+    const inactiveRadioIcon = screen.getByRole("link", { name: /987654321098765/ }).querySelector("svg.lucide-radio")?.parentElement;
+    expect(inactiveRadioIcon).toHaveClass("text-red-700");
     expect(screen.getByText("Niet gekoppeld")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Ruwe JSON bekijken voor item-1" }));
+    expect(screen.getByRole("dialog", { name: "Radio-observatie · item-1" })).toHaveTextContent('"serial_number": "00001234"');
   });
 
   it("starts a targeted sync from the detail page and opens existing task progress", async () => {

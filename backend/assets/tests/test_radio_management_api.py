@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
@@ -133,35 +135,51 @@ def test_subscription_api_replaces_confirmed_link_and_exposes_history(staff_clie
     assert detail["subscription_history"][0]["ended_at"] is not None
 
 
-def test_radio_detail_includes_linked_inventory_history_with_vehicle_and_vector(staff_client):
+def test_radio_fireplan_inventories_are_paginated_newest_first(staff_client):
     vehicle = Vehicle.objects.create(fireplan_id=701, alphacode="AMB-701")
     vector = Vector.objects.create(vector_code="V-701", name="Ploeg 701", vehicle=vehicle)
-    inventory = FireplanInventory.objects.create(
-        uuid="inventory-radio-history",
-        vehicle=vehicle,
-        vector=vector,
-        source_closed_at="2026-11-20T09:00:00Z",
-        last_successful_sync_at="2026-11-20T10:00:00Z",
-    )
     radio = Radio.objects.create(tei="000000000000102")
-    FireplanRadioObservation.objects.create(
-        inventory=inventory,
-        fireplan_item_id="radio-item-102",
-        item_type_id=1010,
-        serial_number=radio.tei,
-        radio=radio,
+    for day in range(1, 13):
+        inventory = FireplanInventory.objects.create(
+            uuid=f"inventory-radio-history-{day:02}",
+            vehicle=vehicle,
+            vector=vector,
+            source_closed_at=datetime(2026, 11, day, 9, tzinfo=UTC),
+            last_successful_sync_at=datetime(2026, 11, day, 10, tzinfo=UTC),
+        )
+        FireplanRadioObservation.objects.create(
+            inventory=inventory,
+            fireplan_item_id=f"radio-item-{day:02}",
+            item_type_id=1010,
+            serial_number=radio.tei,
+            radio=radio,
+        )
+
+    first_page = staff_client.get(reverse("radio-fireplan-inventories", args=[radio.pk]))
+    second_page = staff_client.get(
+        reverse("radio-fireplan-inventories", args=[radio.pk]),
+        {"page": 2, "page_size": 5},
     )
 
-    response = staff_client.get(reverse("radio-detail", args=[radio.pk]))
-
-    assert response.status_code == 200
-    assert response.json()["fireplan_inventories"] == [
-        {
-            "uuid": inventory.uuid,
-            "source_closed_at": "2026-11-20T09:00:00Z",
-            "vehicle": {"alphacode": "AMB-701", "fireplan_id": 701},
-            "vector": {"vector_code": "V-701", "name": "Ploeg 701", "abbreviation": ""},
-        }
+    assert first_page.status_code == 200
+    assert first_page.json()["count"] == 12
+    assert first_page.json()["results"][0]["uuid"] == "inventory-radio-history-12"
+    assert first_page.json()["results"][0]["vehicle"] == {
+        "alphacode": "AMB-701",
+        "fireplan_id": 701,
+    }
+    assert first_page.json()["results"][0]["vector"] == {
+        "vector_code": "V-701",
+        "name": "Ploeg 701",
+        "abbreviation": "",
+    }
+    assert second_page.json()["page"] == 2
+    assert [row["uuid"] for row in second_page.json()["results"]] == [
+        "inventory-radio-history-07",
+        "inventory-radio-history-06",
+        "inventory-radio-history-05",
+        "inventory-radio-history-04",
+        "inventory-radio-history-03",
     ]
 
 

@@ -155,8 +155,8 @@ def _inventory_period_date(value: str | None) -> date | None:
     max_retries=settings.CELERY_TASK_MAX_RETRIES,
     acks_late=True,
     reject_on_worker_lost=True,
-    soft_time_limit=settings.CELERY_TASK_SOFT_TIME_LIMIT,
-    time_limit=settings.CELERY_TASK_TIME_LIMIT,
+    soft_time_limit=settings.CELERY_FIREPLAN_INVENTORY_TASK_SOFT_TIME_LIMIT,
+    time_limit=settings.CELERY_FIREPLAN_INVENTORY_TASK_TIME_LIMIT,
 )
 def synchronize_inventories(
     self,

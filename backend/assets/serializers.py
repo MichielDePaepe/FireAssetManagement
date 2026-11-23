@@ -192,7 +192,6 @@ class RadioManagementSerializer(serializers.ModelSerializer):
     )
     current_subscription = serializers.SerializerMethodField()
     subscription_history = serializers.SerializerMethodField()
-    fireplan_inventories = serializers.SerializerMethodField()
 
     class Meta:
         model = Radio
@@ -200,7 +199,6 @@ class RadioManagementSerializer(serializers.ModelSerializer):
             "id", "managed_object", "tei", "manufacturer", "model_name",
             "model", "model_id", "fireplan_id", "fireplan_qr_url", "created_at", "updated_at",
             "current_subscription", "subscription_history",
-            "fireplan_inventories",
         ]
         read_only_fields = [
             "id", "fireplan_id", "fireplan_qr_url", "created_at", "updated_at",
@@ -209,13 +207,6 @@ class RadioManagementSerializer(serializers.ModelSerializer):
 
     def validate_tei(self, value):
         return _validated_tei(value)
-
-    def get_fields(self):
-        fields = super().get_fields()
-        view = self.context.get("view")
-        if getattr(view, "action", None) != "retrieve":
-            fields.pop("fireplan_inventories", None)
-        return fields
 
     def get_current_subscription(self, instance):
         subscription = (
@@ -228,33 +219,6 @@ class RadioManagementSerializer(serializers.ModelSerializer):
     def get_subscription_history(self, instance):
         history = instance.subscription_history.select_related("issi").order_by("started_at", "id")
         return RadioSubscriptionSerializer(history, many=True).data
-
-    def get_fireplan_inventories(self, instance):
-        return [
-            {
-                "uuid": observation.inventory.uuid,
-                "source_closed_at": observation.inventory.source_closed_at,
-                "vehicle": (
-                    {
-                        "alphacode": observation.inventory.vehicle.alphacode,
-                        "fireplan_id": observation.inventory.vehicle.fireplan_id,
-                    }
-                    if observation.inventory.vehicle_id
-                    else None
-                ),
-                "vector": (
-                    {
-                        "vector_code": observation.inventory.vector.vector_code,
-                        "name": observation.inventory.vector.name,
-                        "abbreviation": observation.inventory.vector.abbreviation,
-                    }
-                    if observation.inventory.vector_id
-                    else None
-                ),
-            }
-            for observation in instance.fireplan_observations.all()
-        ]
-
 
 class IssiManagementSerializer(IssiSerializer):
     current_subscription = serializers.SerializerMethodField()

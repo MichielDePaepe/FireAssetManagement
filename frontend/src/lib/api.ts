@@ -116,7 +116,7 @@ export interface FireplanInventoryDetail {
     fireplan_item_id: string;
     item_type_id: number;
     serial_number: string;
-    radio: { id: number; tei: string } | null;
+    radio: { id: number; tei: string; issi_alias: string | null; is_active: boolean } | null;
   }>;
 }
 
@@ -125,6 +125,20 @@ export interface FireplanInventoryPage {
   page: number;
   page_size: number;
   results: FireplanInventorySummary[];
+}
+
+export interface FireplanRadioInventory {
+  uuid: string;
+  source_closed_at: string | null;
+  vehicle: { alphacode: string; fireplan_id: number } | null;
+  vector: { vector_code: string; name: string; abbreviation: string } | null;
+}
+
+export interface FireplanRadioInventoryPage {
+  count: number;
+  page: number;
+  page_size: number;
+  results: FireplanRadioInventory[];
 }
 
 export interface StartedTask {
@@ -301,12 +315,6 @@ export interface RadioAsset {
   updated_at: string;
   current_subscription?: RadioSubscription | null;
   subscription_history?: RadioSubscription[];
-  fireplan_inventories?: Array<{
-    uuid: string;
-    source_closed_at: string | null;
-    vehicle: { alphacode: string; fireplan_id: number } | null;
-    vector: { vector_code: string; name: string; abbreviation: string } | null;
-  }>;
 }
 
 export interface Organization {
@@ -508,6 +516,10 @@ export const api = {
   listRadios: (search = "") =>
     request<RadioAsset[]>(`/radios/${search ? `?search=${encodeURIComponent(search)}` : ""}`),
   getRadio: (id: number) => request<RadioAsset>(`/radios/${id}/`),
+  getRadioFireplanInventories: (id: number, page = 1, pageSize = 10) =>
+    request<FireplanRadioInventoryPage>(
+      `/radios/${id}/fireplan-inventories/?page=${page}&page_size=${pageSize}`,
+    ),
   getRadioRelationship: (id: number) =>
     request<RadioRelationshipSnapshot>(`/inventory/radios/${id}/relationship/`),
   updateRadioRelationship: (id: number, values: {

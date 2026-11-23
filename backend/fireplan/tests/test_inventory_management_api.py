@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from django.urls import reverse
 
-from assets.models import Radio
+from assets.models import Issi, Radio, RadioSubscription
 from citygis.models import Vector, VectorVehicleHistory, Vehicle
 from fireplan.client import FireplanInventoryError
 from fireplan.models import FireplanCredential, FireplanInventory, FireplanRadioObservation
@@ -153,12 +153,14 @@ def test_inventory_detail_returns_saved_snapshot_and_survives_failed_later_attem
         last_successful_sync_at=datetime(2026, 11, 20, 10, tzinfo=UTC),
         last_error="FirePlan unavailable",
     )
-    radio = Radio.objects.create(tei="000000000000101")
+    radio = Radio.objects.create(tei="123456789012340")
+    issi = Issi.objects.create(issi="1010101010", alias="Ploeg Alfa")
+    RadioSubscription.assign(radio, issi)
     FireplanRadioObservation.objects.create(
         inventory=inventory,
         fireplan_item_id="item-1",
         item_type_id=1010,
-        serial_number="00001234",
+        serial_number="12345678901234",
         radio=radio,
     )
     FireplanRadioObservation.objects.create(
@@ -182,8 +184,13 @@ def test_inventory_detail_returns_saved_snapshot_and_survives_failed_later_attem
         {
             "fireplan_item_id": "item-1",
             "item_type_id": 1010,
-            "serial_number": "00001234",
-            "radio": {"id": radio.pk, "tei": radio.tei},
+            "serial_number": "12345678901234",
+            "radio": {
+                "id": radio.pk,
+                "tei": radio.tei,
+                "issi_alias": "Ploeg Alfa",
+                "is_active": True,
+            },
         },
         {
             "fireplan_item_id": "item-unmatched",

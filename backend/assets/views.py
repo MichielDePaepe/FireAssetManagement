@@ -2,14 +2,15 @@ import csv
 import io
 
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from fireplan.models import FireplanRadioObservation
+from fireplan.models import FireplanInventory
 
 from .models import (
     Issi,
@@ -63,15 +64,6 @@ class RadioViewSet(viewsets.ModelViewSet):
         ).prefetch_related(
             "subscription_history__issi"
         )
-        if getattr(self, "action", None) == "retrieve":
-            queryset = queryset.prefetch_related(
-                Prefetch(
-                    "fireplan_observations",
-                    queryset=FireplanRadioObservation.objects.select_related(
-                        "inventory", "inventory__vehicle", "inventory__vector"
-                    ).order_by("inventory__source_closed_at", "inventory__uuid"),
-                )
-            )
         query = self.request.query_params.get("search", "").strip()
         if not query:
             return queryset
@@ -95,6 +87,52 @@ class RadioViewSet(viewsets.ModelViewSet):
         if query.isdecimal():
             matches |= Q(fireplan_id=int(query))
         return queryset.filter(matches).distinct()
+
+    @action(detail=True, methods=["get"], url_path="fireplan-inventories")
+    def fireplan_inventories(self, request, pk=None):
+        radio = self.get_object()
+        try:
+            page = int(request.query_params.get("page", "1"))
+            page_size = int(request.query_params.get("page_size", "10"))
+        except ValueError:
+            return Response(
+                {"detail": "Paginanummer en paginagrootte moeten getallen zijn."}, status=400
+            )
+        if page < 1 or page_size < 1 or page_size > 50:
+            return Response({"detail": "Paginanummer of paginagrootte buiten bereik."}, status=400)
+
+        inventories = FireplanInventory.objects.filter(
+            radio_observations__radio=radio
+        ).select_related("vehicle", "vector").order_by(
+            "-source_closed_at", "-uuid"
+        ).distinct()
+        count = inventories.count()
+        start = (page - 1) * page_size
+        results = [
+            {
+                "uuid": inventory.uuid,
+                "source_closed_at": inventory.source_closed_at,
+                "vehicle": (
+                    {
+                        "alphacode": inventory.vehicle.alphacode,
+                        "fireplan_id": inventory.vehicle.fireplan_id,
+                    }
+                    if inventory.vehicle_id
+                    else None
+                ),
+                "vector": (
+                    {
+                        "vector_code": inventory.vector.vector_code,
+                        "name": inventory.vector.name,
+                        "abbreviation": inventory.vector.abbreviation,
+                    }
+                    if inventory.vector_id
+                    else None
+                ),
+            }
+            for inventory in inventories[start : start + page_size]
+        ]
+        return Response({"count": count, "page": page, "page_size": page_size, "results": results})
 
 
 class IssiViewSet(viewsets.ModelViewSet):
