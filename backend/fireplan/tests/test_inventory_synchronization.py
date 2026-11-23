@@ -2,6 +2,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 
+from assets.models import Radio
 from citygis.models import Vector, VectorVehicleHistory, Vehicle
 from fireplan.client import FireplanInventoryError
 from fireplan.inventory_synchronization import synchronize_fireplan_inventories
@@ -79,10 +80,60 @@ def test_sync_processes_new_inventory_once_and_skips_same_mapping_on_next_run():
     assert FireplanRadioObservation.objects.filter(inventory=inventory).count() == 1
 
 
+def test_sync_links_normalized_tei_and_preserves_unmatched_source_numbers():
+    radio14 = Radio.objects.create(tei="123456789012340")
+    radio15 = Radio.objects.create(tei="123456789012345")
+    client = FakeClient(
+        radio_items=[
+            {
+                "fireplan_item_id": "fourteen",
+                "item_type_id": 1010,
+                "item_type_name": "Radio",
+                "serial_number": "12345678901234",
+            },
+            {
+                "fireplan_item_id": "fifteen",
+                "item_type_id": 1010,
+                "item_type_name": "Radio",
+                "serial_number": "123456789012345",
+            },
+            {
+                "fireplan_item_id": "unmatched",
+                "item_type_id": 1010,
+                "item_type_name": "Radio",
+                "serial_number": "bad-value",
+            },
+        ]
+    )
+
+    synchronize_fireplan_inventories(client)
+
+    observations = {
+        row.fireplan_item_id: row
+        for row in FireplanRadioObservation.objects.select_related("radio")
+    }
+    assert observations["fourteen"].radio == radio14
+    assert observations["fourteen"].serial_number == "12345678901234"
+    assert observations["fifteen"].radio == radio15
+    assert observations["unmatched"].radio is None
+
+
 def test_sync_refetches_and_replaces_observations_when_mapping_version_changes():
-    client = FakeClient()
+    client = FakeClient(
+        radio_items=[
+            {
+                "fireplan_item_id": "item-1",
+                "item_type_id": 1010,
+                "item_type_name": "Radio",
+            "serial_number": "12345678901234",
+            }
+        ]
+    )
     synchronize_fireplan_inventories(client)
     inventory = FireplanInventory.objects.get(uuid="inv-1")
+    observation = inventory.radio_observations.get()
+    assert observation.radio is None
+    radio = Radio.objects.create(tei="123456789012340")
     old_success = inventory.last_successful_sync_at
     client.mapping = {"version": 2}
     client.radio_items = [
@@ -90,7 +141,7 @@ def test_sync_refetches_and_replaces_observations_when_mapping_version_changes()
             "fireplan_item_id": "item-2",
             "item_type_id": 1010,
             "item_type_name": "Radio portable Astrid",
-            "serial_number": "00009999",
+                "serial_number": "12345678901234",
         }
     ]
 
@@ -104,10 +155,21 @@ def test_sync_refetches_and_replaces_observations_when_mapping_version_changes()
     assert list(inventory.radio_observations.values_list("fireplan_item_id", flat=True)) == [
         "item-2"
     ]
+    assert inventory.radio_observations.get().radio == radio
 
 
 def test_failed_detail_fetch_keeps_last_successful_json_observations_and_time():
-    client = FakeClient()
+    radio = Radio.objects.create(tei="123456789012340")
+    client = FakeClient(
+        radio_items=[
+            {
+                "fireplan_item_id": "item-1",
+                "item_type_id": 1010,
+                "item_type_name": "Radio",
+                "serial_number": "12345678901234",
+            }
+        ]
+    )
     synchronize_fireplan_inventories(client)
     inventory = FireplanInventory.objects.get(uuid="inv-1")
     old_json = inventory.radio_items
@@ -126,6 +188,7 @@ def test_failed_detail_fetch_keeps_last_successful_json_observations_and_time():
     assert list(inventory.radio_observations.values_list("fireplan_item_id", flat=True)) == [
         "item-1"
     ]
+    assert inventory.radio_observations.get().radio == radio
 
 
 def test_failed_targeted_sync_keeps_full_successful_snapshot_and_relationships():

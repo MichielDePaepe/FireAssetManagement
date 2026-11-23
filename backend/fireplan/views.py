@@ -322,7 +322,7 @@ class FireplanInventoryDetailView(APIView):
     def get(self, request, inventory_uuid):
         inventory = get_object_or_404(
             FireplanInventory.objects.select_related("vehicle", "vector").prefetch_related(
-                "radio_observations"
+                "radio_observations__radio"
             ),
             uuid=inventory_uuid,
             last_successful_sync_at__isnull=False,
@@ -371,6 +371,11 @@ class FireplanInventoryDetailView(APIView):
                         "fireplan_item_id": observation.fireplan_item_id,
                         "item_type_id": observation.item_type_id,
                         "serial_number": observation.serial_number,
+                        "radio": (
+                            {"id": observation.radio_id, "tei": observation.radio.tei}
+                            if observation.radio_id
+                            else None
+                        ),
                     }
                     for observation in inventory.radio_observations.all()
                 ],

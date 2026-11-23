@@ -12,6 +12,8 @@ from assets.models import (
     RadioSubscription,
     TeiRange,
 )
+from citygis.models import Vector, Vehicle
+from fireplan.models import FireplanInventory, FireplanRadioObservation
 
 pytestmark = pytest.mark.django_db
 
@@ -129,6 +131,38 @@ def test_subscription_api_replaces_confirmed_link_and_exposes_history(staff_clie
     assert detail["current_subscription"]["issi"]["id"] == second_issi.pk
     assert len(detail["subscription_history"]) == 2
     assert detail["subscription_history"][0]["ended_at"] is not None
+
+
+def test_radio_detail_includes_linked_inventory_history_with_vehicle_and_vector(staff_client):
+    vehicle = Vehicle.objects.create(fireplan_id=701, alphacode="AMB-701")
+    vector = Vector.objects.create(vector_code="V-701", name="Ploeg 701", vehicle=vehicle)
+    inventory = FireplanInventory.objects.create(
+        uuid="inventory-radio-history",
+        vehicle=vehicle,
+        vector=vector,
+        source_closed_at="2026-11-20T09:00:00Z",
+        last_successful_sync_at="2026-11-20T10:00:00Z",
+    )
+    radio = Radio.objects.create(tei="000000000000102")
+    FireplanRadioObservation.objects.create(
+        inventory=inventory,
+        fireplan_item_id="radio-item-102",
+        item_type_id=1010,
+        serial_number=radio.tei,
+        radio=radio,
+    )
+
+    response = staff_client.get(reverse("radio-detail", args=[radio.pk]))
+
+    assert response.status_code == 200
+    assert response.json()["fireplan_inventories"] == [
+        {
+            "uuid": inventory.uuid,
+            "source_closed_at": "2026-11-20T09:00:00Z",
+            "vehicle": {"alphacode": "AMB-701", "fireplan_id": 701},
+            "vector": {"vector_code": "V-701", "name": "Ploeg 701", "abbreviation": ""},
+        }
+    ]
 
 
 def test_staff_can_manage_organizations_models_and_ranges(staff_client):

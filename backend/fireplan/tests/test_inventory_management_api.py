@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from django.urls import reverse
 
+from assets.models import Radio
 from citygis.models import Vector, VectorVehicleHistory, Vehicle
 from fireplan.client import FireplanInventoryError
 from fireplan.models import FireplanCredential, FireplanInventory, FireplanRadioObservation
@@ -152,11 +153,19 @@ def test_inventory_detail_returns_saved_snapshot_and_survives_failed_later_attem
         last_successful_sync_at=datetime(2026, 11, 20, 10, tzinfo=UTC),
         last_error="FirePlan unavailable",
     )
+    radio = Radio.objects.create(tei="000000000000101")
     FireplanRadioObservation.objects.create(
         inventory=inventory,
         fireplan_item_id="item-1",
         item_type_id=1010,
         serial_number="00001234",
+        radio=radio,
+    )
+    FireplanRadioObservation.objects.create(
+        inventory=inventory,
+        fireplan_item_id="item-unmatched",
+        item_type_id=1010,
+        serial_number="unknown-source-value",
     )
 
     response = admin_client.get(reverse("fireplan-inventory-detail", args=[inventory.uuid]))
@@ -170,7 +179,18 @@ def test_inventory_detail_returns_saved_snapshot_and_survives_failed_later_attem
     assert payload["vector"]["vector_code"] == "V-LOCAL"
     assert payload["radio_items"] == [{"fireplan_item_id": "item-1", "serial_number": "00001234"}]
     assert payload["radio_observations"] == [
-        {"fireplan_item_id": "item-1", "item_type_id": 1010, "serial_number": "00001234"}
+        {
+            "fireplan_item_id": "item-1",
+            "item_type_id": 1010,
+            "serial_number": "00001234",
+            "radio": {"id": radio.pk, "tei": radio.tei},
+        },
+        {
+            "fireplan_item_id": "item-unmatched",
+            "item_type_id": 1010,
+            "serial_number": "unknown-source-value",
+            "radio": None,
+        },
     ]
 
 

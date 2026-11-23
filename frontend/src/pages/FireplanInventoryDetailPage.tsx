@@ -140,9 +140,9 @@ export function FireplanInventoryDetailPage() {
               {inventory.radio_observations.length ? (
                 <div className="overflow-x-auto">
                   <table className="w-full table-fixed border-collapse text-left text-sm">
-                    <colgroup><col className="w-[35%]" /><col className="w-[25%]" /><col className="w-[40%]" /></colgroup>
+                    <colgroup><col className="w-[30%]" /><col className="w-[20%]" /><col className="w-[30%]" /><col className="w-[20%]" /></colgroup>
                     <thead className="border-b bg-muted/70 text-xs font-medium text-muted-foreground">
-                      <tr><th scope="col" className="px-3 py-3">FirePlan-item-ID</th><th scope="col" className="px-3 py-3">Itemtype</th><th scope="col" className="px-3 py-3">TEI</th></tr>
+                      <tr><th scope="col" className="px-3 py-3">FirePlan-item-ID</th><th scope="col" className="px-3 py-3">Itemtype</th><th scope="col" className="px-3 py-3">TEI</th><th scope="col" className="px-3 py-3">FAM-radio</th></tr>
                     </thead>
                     <tbody className="divide-y">
                       {inventory.radio_observations.map((observation) => (
@@ -150,6 +150,7 @@ export function FireplanInventoryDetailPage() {
                           <td className="break-all px-3 py-3">{observation.fireplan_item_id}</td>
                           <td className="px-3 py-3">{observation.item_type_id}</td>
                           <td className="break-all px-3 py-3 font-mono">{observation.serial_number}</td>
+                          <td className="break-all px-3 py-3">{observation.radio ? <Link className="underline underline-offset-4" to={`/radios/${observation.radio.id}`}>{observation.radio.tei}</Link> : <span className="text-muted-foreground">Niet gekoppeld</span>}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -116,6 +116,7 @@ export interface FireplanInventoryDetail {
     fireplan_item_id: string;
     item_type_id: number;
     serial_number: string;
+    radio: { id: number; tei: string } | null;
   }>;
 }
 
@@ -300,6 +301,12 @@ export interface RadioAsset {
   updated_at: string;
   current_subscription?: RadioSubscription | null;
   subscription_history?: RadioSubscription[];
+  fireplan_inventories?: Array<{
+    uuid: string;
+    source_closed_at: string | null;
+    vehicle: { alphacode: string; fireplan_id: number } | null;
+    vector: { vector_code: string; name: string; abbreviation: string } | null;
+  }>;
 }
 
 export interface Organization {

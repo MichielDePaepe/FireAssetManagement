@@ -53,6 +53,14 @@ const sampleRadio = {
       ended_at: null,
     },
   ],
+  fireplan_inventories: [
+    {
+      uuid: "inventory-2026-11",
+      source_closed_at: "2026-11-20T09:00:00Z",
+      vehicle: { alphacode: "AMB-701", fireplan_id: 701 },
+      vector: { vector_code: "V-701", name: "Ploeg 701", abbreviation: "P701" },
+    },
+  ],
 };
 const sampleIssi = {
   id: 11,
@@ -69,8 +77,8 @@ const sampleCityGIS = {
   statuses: [], last_refreshed_at: null, sync_state: { last_attempted_at: null, last_succeeded_at: null, last_error: null },
 } satisfies CityGISSnapshot;
 
-function renderPage() {
-  return render(<MemoryRouter initialEntries={["/radios"]}><Routes>
+function renderPage(initialEntry = "/radios") {
+  return render(<MemoryRouter initialEntries={[initialEntry]}><Routes>
     <Route path="/radios" element={<RadioManagementPage />} />
     <Route path="/radios/:radioId" element={<RadioDetailPage />} />
   </Routes></MemoryRouter>);
@@ -102,6 +110,17 @@ describe("RadioManagementPage", () => {
     expect(screen.getByRole("tab", { name: "ISSI's" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Abonnementen" })).toBeInTheDocument();
     expect(screen.queryByLabelText("FirePlan-ID")).not.toBeInTheDocument();
+  });
+
+  it("shows linked FirePlan inventories and their vehicle and vector", async () => {
+    renderPage("/radios/7");
+
+    expect(await screen.findByRole("heading", { name: "FirePlan-inventarissen" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "20 nov 2026, 09:00" })).toHaveAttribute(
+      "href",
+      "/fireplan/inventories/inventory-2026-11",
+    );
+    expect(screen.getByText("AMB-701 · V-701 · Ploeg 701")).toBeInTheDocument();
   });
 
   it("keeps an accessible loading state until the module data arrives", () => {

@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from django.db import IntegrityError, transaction
 
+from assets.models import Pager, PagerType, Radio
 from citygis.models import Vector, VectorVehicleHistory, Vehicle
 from fireplan.inventory_relationships import resolve_inventory_relationship
 from fireplan.models import FireplanInventory, FireplanRadioObservation
@@ -62,12 +63,31 @@ def test_radio_observation_preserves_tei_as_text_and_is_unique_per_source_item()
 
     assert observation.serial_number == "0000123405"
     assert isinstance(observation.serial_number, str)
+    assert observation.radio is None
+    assert observation.pager is None
     with pytest.raises(IntegrityError), transaction.atomic():
         FireplanRadioObservation.objects.create(
             inventory=row,
             fireplan_item_id="item-1",
             item_type_id=1010,
             serial_number="different",
+        )
+
+
+def test_radio_observation_cannot_link_both_radio_and_pager():
+    row = inventory()
+    radio = Radio.objects.create(tei="000000000000101")
+    pager_type = PagerType.objects.create(name="T1")
+    pager = Pager.objects.create(serial_number="PAGER-101", type=pager_type)
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        FireplanRadioObservation.objects.create(
+            inventory=row,
+            fireplan_item_id="item-both",
+            item_type_id=1010,
+            serial_number="000000000000101",
+            radio=radio,
+            pager=pager,
         )
 
 

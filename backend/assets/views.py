@@ -2,12 +2,14 @@ import csv
 import io
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from fireplan.models import FireplanRadioObservation
 
 from .models import (
     Issi,
@@ -61,6 +63,15 @@ class RadioViewSet(viewsets.ModelViewSet):
         ).prefetch_related(
             "subscription_history__issi"
         )
+        if getattr(self, "action", None) == "retrieve":
+            queryset = queryset.prefetch_related(
+                Prefetch(
+                    "fireplan_observations",
+                    queryset=FireplanRadioObservation.objects.select_related(
+                        "inventory", "inventory__vehicle", "inventory__vector"
+                    ).order_by("inventory__source_closed_at", "inventory__uuid"),
+                )
+            )
         query = self.request.query_params.get("search", "").strip()
         if not query:
             return queryset

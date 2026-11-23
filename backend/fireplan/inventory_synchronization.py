@@ -8,6 +8,7 @@ from .client import FireplanInventoryError
 from .inventory_mapping import parse_fireplan_datetime
 from .inventory_relationships import resolve_inventory_relationship
 from .models import FireplanInventory, FireplanRadioObservation
+from .radio_matching import matched_radio_id, radio_ids_by_observation_tei
 
 
 def _optional_text(record: dict, field: str) -> str:
@@ -216,6 +217,9 @@ def synchronize_fireplan_inventories(
                 for field, value in defaults.items():
                     setattr(inventory, field, value)
             inventory.radio_observations.all().delete()
+            radio_ids = radio_ids_by_observation_tei(
+                {item["serial_number"] for item in radio_items}
+            )
             FireplanRadioObservation.objects.bulk_create(
                 [
                     FireplanRadioObservation(
@@ -223,6 +227,7 @@ def synchronize_fireplan_inventories(
                         fireplan_item_id=item["fireplan_item_id"],
                         item_type_id=item["item_type_id"],
                         serial_number=item["serial_number"],
+                        radio_id=matched_radio_id(item["serial_number"], radio_ids),
                     )
                     for item in radio_items
                 ]

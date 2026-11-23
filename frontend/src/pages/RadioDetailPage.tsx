@@ -133,6 +133,16 @@ export function RadioDetailPage() {
       </Card>
 
       <Card>
+        <CardHeader><CardTitle>FirePlan-inventarissen</CardTitle><CardDescription>{radio.fireplan_inventories?.length ?? 0} inventariswaarnemingen</CardDescription></CardHeader>
+        <CardContent>
+          {radio.fireplan_inventories?.length ? <ul className="space-y-2">{radio.fireplan_inventories.map((inventory) => <li key={inventory.uuid} className="border p-3 text-sm">
+            <Link className="underline underline-offset-4" to={`/fireplan/inventories/${encodeURIComponent(inventory.uuid)}`}>{formatDate(inventory.source_closed_at)}</Link>
+            <p className="mt-1 text-xs text-muted-foreground">{[inventory.vehicle?.alphacode, inventory.vector?.vector_code, inventory.vector?.name].filter(Boolean).join(" · ") || "Geen voertuig- of vectorinformatie"}</p>
+          </li>)}</ul> : <p className="text-sm text-muted-foreground">Geen FirePlan-inventariswaarnemingen.</p>}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader><CardTitle>Plaatsing</CardTitle><CardDescription>Huidige bestemming en historiek</CardDescription></CardHeader>
         <CardContent className="space-y-4">
           {relationshipLoading && <p role="status" className="text-sm text-muted-foreground">Plaatsingsgegevens laden…</p>}

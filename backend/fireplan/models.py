@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 
 
 class FireplanCredential(models.Model):
@@ -74,6 +75,20 @@ class FireplanRadioObservation(models.Model):
     fireplan_item_id = models.CharField(max_length=120)
     item_type_id = models.PositiveIntegerField()
     serial_number = models.TextField()
+    radio = models.ForeignKey(
+        "assets.Radio",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="fireplan_observations",
+    )
+    pager = models.ForeignKey(
+        "assets.Pager",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="fireplan_observations",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -82,7 +97,11 @@ class FireplanRadioObservation(models.Model):
             models.UniqueConstraint(
                 fields=["inventory", "fireplan_item_id"],
                 name="uniq_fireplan_inventory_item",
-            )
+            ),
+            models.CheckConstraint(
+                condition=Q(radio__isnull=True) | Q(pager__isnull=True),
+                name="fireplan_observation_single_asset",
+            ),
         ]
 
     def __str__(self) -> str:

@@ -91,7 +91,10 @@ const inventoryDetail: FireplanInventoryDetail = {
   last_successful_sync_at: "2026-11-20T10:00:00+01:00",
   last_error: "FirePlan tijdelijk onbeschikbaar",
   radio_items: [{ fireplan_item_id: "item-1", serial_number: "00001234" }],
-  radio_observations: [{ fireplan_item_id: "item-1", item_type_id: 1010, serial_number: "00001234" }],
+  radio_observations: [
+    { fireplan_item_id: "item-1", item_type_id: 1010, serial_number: "00001234", radio: { id: 5, tei: "00000000000005" } },
+    { fireplan_item_id: "item-unmatched", item_type_id: 1010, serial_number: "unmatched-value", radio: null },
+  ],
 };
 
 function renderPage() {
@@ -160,6 +163,8 @@ describe("FireplanInventoriesPage", () => {
     expect(screen.getByText(/"serial_number": "00001234"/)).toBeInTheDocument();
     expect(screen.getByText("V-LOCAL")).toBeInTheDocument();
     expect(screen.getByText("00001234")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "00000000000005" })).toHaveAttribute("href", "/radios/5");
+    expect(screen.getByText("Niet gekoppeld")).toBeInTheDocument();
   });
 
   it("starts a targeted sync from the detail page and opens existing task progress", async () => {
