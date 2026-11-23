@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, ChevronDown, ChevronRight, RefreshCw, Signal, SignalZero } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CityGISStatusHistoryDialog } from "@/components/CityGISStatusHistoryDialog";
 import { api, subscribeToCityGIS, type CityGISLocation, type CityGISSnapshot, type CityGISVector } from "@/lib/api";
@@ -166,7 +167,9 @@ export function DashboardPage() {
               <tbody className="divide-y divide-border">
                 {rows.map((row) => <tr key={row.location.id} className="align-top hover:bg-muted/20">
                   <th scope="row" className="px-3 py-3 text-left font-semibold">
-                    <span className="block whitespace-normal break-words">{row.location.name}</span>
+                    <Link to={`/posts/${row.location.id}`} className="block whitespace-normal break-words text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {row.location.name}
+                    </Link>
                   </th>
                   {GROUPS.map(({ key, columns }) => <td key={key} className="px-2 py-2 align-top">
                     <AssetCell vectors={row.groups[key]} columns={columns} knownStatusCodes={knownStatusCodes} onStatus={setHistoryVector} />

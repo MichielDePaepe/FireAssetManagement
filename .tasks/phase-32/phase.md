@@ -1,9 +1,9 @@
 ---
 phase: 32
 title: Postdashboardgegevens
-status: pending
-opened: ~
-closed: ~
+status: closed
+opened: 2026-11-23
+closed: 2026-11-23
 ---
 ## Goal
 Breid de bestaande postoverzichtsaanvraag uit met actuele vectoren, voertuigen, fysieke assetkoppelingen en volledige statusperiodes voor de laatste 24 uur.
@@ -21,3 +21,13 @@ Breid de bestaande postoverzichtsaanvraag uit met actuele vectoren, voertuigen, 
 - De aanvraag bevat voldoende historie om het hele 24-uursvenster te dekken en is niet beperkt tot de bestaande limiet van 50 statusrecords per vector.
 
 ## Tasks
+- [x] task-01-post-overview-data-contract.md
+
+## Carry-forward
+
+### Carry from phase 32
+1. `/locations/{id}/overview/` returns one shared `status_window` and per-vector `pagers`, `radios`, and chronologically clipped `status_periods`; each period has `status_code`, `status_description`, `status_abbreviation`, `status_color`, `starts_at`, `ends_at`, `duration_seconds`, and `is_unknown`.
+2. The API response derives active physical links and the complete 24-hour timeline from existing relationships and status history; no schema or dependency change was made.
+
+### Open follow-ups from phase 32
+- none

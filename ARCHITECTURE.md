@@ -74,7 +74,7 @@ All API routes are same-origin under `/api`. Vite proxies requests in developmen
 | GET, POST | `/api/locations/` | List or create locations; staff only |
 | GET, PUT, PATCH, DELETE | `/api/locations/{id}/` | Read, update, or delete a location; staff only |
 | GET | `/api/locations/services/` | List normalized CityGIS services and their mapped location IDs; staff only |
-| GET | `/api/locations/{id}/overview/` | Read a location, mapped service, and current vectors with status and linked vehicle; staff only |
+| GET | `/api/locations/{id}/overview/` | Read a location, mapped service, current vectors and vehicles, active pager/radio links, and each vector's complete clipped 24-hour status timeline with unknown gaps; staff only |
 | GET | `/api/inventory/` | Read locations, vectors, pagers, and current RiC/AdC links; staff only |
 | PUT | `/api/inventory/pagers/{id}/vector/` | Assign a pager to a vector or close its active assignment with `vector_id: null`; staff only |
 | PUT | `/api/inventory/ric-codes/{id}/vector/` | Assign a RiC/AdC record to a vector or close its active link with `vector_id: null`; staff only |

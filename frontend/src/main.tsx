@@ -8,6 +8,7 @@ import { GlobalToaster } from "@/components/GlobalToaster";
 import "@/styles.css";
 
 const DashboardPage = lazy(() => import("@/pages/DashboardPage").then((module) => ({ default: module.DashboardPage })));
+const PostDashboardPage = lazy(() => import("@/pages/PostDashboardPage").then((module) => ({ default: module.PostDashboardPage })));
 const LoginPage = lazy(() => import("@/pages/LoginPage").then((module) => ({ default: module.LoginPage })));
 const TaskDetailPage = lazy(() => import("@/pages/TaskDetailPage").then((module) => ({ default: module.TaskDetailPage })));
 const TasksPage = lazy(() => import("@/pages/TasksPage").then((module) => ({ default: module.TasksPage })));
@@ -43,6 +44,7 @@ function App() {
     <Route path="/login" element={<LoginPage />} />
     <Route element={<ProtectedLayout />}><Route element={<AppLayout />}>
       <Route index element={<DashboardPage />} />
+      <Route path="posts/:postId" element={<PostDashboardPage />} />
       <Route path="tasks" element={<TasksPage />} />
       <Route path="pagers" element={<PagersPage />} />
       <Route path="radios" element={<RadioManagementPage />} />

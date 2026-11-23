@@ -72,6 +72,8 @@ After pushing the code to GitHub, enable **Settings → General → Template rep
 
 The staff dashboard opens on a live overview of posts and their current CityGIS vectors. Vectors are grouped into APM, AE, AMB, Rest, and Status 90+; status 99 always appears in Rest, where CMD, MSERV, and FAUB are shown first. Each column shows available/total counts, with status 0 and 6 counted as available. A colored vertical status bar opens that vector's CityGIS status history. APM, AE, AMB, and Status 90+ show two columns of vectors; Rest shows three. Large groups can be expanded in place. The page loads from the existing locations and CityGIS APIs and updates through the existing CityGIS event stream.
 
+Selecting a post opens its shareable **Postdashboard** at `/posts/{id}`. The page shows current vectors, their CityGIS status and linked FirePlan vehicle fields, and physical pagers and radios placed on each vector. A time-scaled status bar covers the full latest 24 hours, uses CityGIS status colors, and marks missing status as unknown. Tooltips include status, duration, and period times; keyboard users can focus each segment. Percentages cover available statuses (0 and 6), other numeric statuses below 90, statuses from 90, and unknown time. Vectors are grouped in APM, AE, CMD, MSERV, FAUB, and AMB sections; AMBINC is grouped with AMB, and other types appear in a collapsed group when present. The page uses the existing post-overview API and CityGIS event stream.
+
 ## Background task flow
 
 1. The browser POSTs to `POST /api/tasks/`; Django responds with Celery's task ID.

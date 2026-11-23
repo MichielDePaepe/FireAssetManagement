@@ -167,7 +167,14 @@ export interface LocationValues {
 export interface LocationOverview {
   location: CityGISLocation;
   service: CityGISService | null;
-  vectors: CityGISVector[];
+  status_window: { starts_at: string; ends_at: string };
+  vectors: CityGISPostVector[];
+}
+
+export interface CityGISPostVector extends CityGISVector {
+  pagers: Pager[];
+  radios: RadioAsset[];
+  status_periods: CityGISStatusPeriod[];
 }
 
 export interface CityGISVehicle {
@@ -210,6 +217,17 @@ export interface CityGISVector {
   source_vehicle_name: string;
   is_current: boolean;
   last_seen_at: string | null;
+}
+
+export interface CityGISStatusPeriod {
+  status_code: string | null;
+  status_description: string | null;
+  status_abbreviation: string | null;
+  status_color: string | null;
+  starts_at: string;
+  ends_at: string;
+  duration_seconds: number;
+  is_unknown: boolean;
 }
 
 export interface CityGISSyncState {
@@ -262,12 +280,15 @@ export interface Pager {
   managed_object: ManagedObjectIdentity;
   serial_number: string;
   type: PagerType;
+  fireplan_id?: number | null;
+  fireplan_qr_url?: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface RadioAsset {
   id: number;
+  managed_object?: ManagedObjectIdentity;
   tei: string;
   manufacturer: string;
   model_name: string;

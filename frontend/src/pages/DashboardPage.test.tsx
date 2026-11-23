@@ -82,6 +82,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("P-HEL")).toBeInTheDocument();
     expect(screen.queryByText("01.01")).not.toBeInTheDocument();
     expect(screen.getByText("P-HEL")).toHaveClass("break-words");
+    expect(screen.getByRole("link", { name: "Helihaven" })).toHaveAttribute("href", "/posts/1");
     expect(screen.getByRole("columnheader", { name: /APM/ })).toHaveTextContent("1/1");
     expect(screen.getByRole("columnheader", { name: /AMB/ })).toHaveTextContent("1/2");
     expect(screen.queryByText("Recent background tasks")).not.toBeInTheDocument();
