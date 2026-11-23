@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CityGISPostVector, CityGISStatusPeriod } from "@/lib/api";
-import { calculateStatusPercentages, groupPostVectors } from "@/lib/postDashboardStatus";
+import { calculateStatusSummary, groupPostVectors, mergeConsecutiveStatusPeriods } from "@/lib/postDashboardStatus";
 
 const period = (status_code: string | null, duration_seconds: number, is_unknown = false) => ({
   status_code,
@@ -24,16 +24,35 @@ const vector = (id: number, type: string) => ({
 }) as CityGISPostVector;
 
 describe("post dashboard status", () => {
-  it("allocates rounding so the four 24-hour percentage categories total 100", () => {
-    const values = calculateStatusPercentages([
+  it("combines status 0 and 6 as available and reports duration with four percentages", () => {
+    const values = calculateStatusSummary([
       period("0", 8_640),
       period("6", 8_640),
       period("12", 8_640),
       period("90", 8_640),
       period(null, 8_640, true),
     ], 43_200);
-    expect(values).toEqual({ available: 40, other: 20, outOfService: 20, unknown: 20 });
-    expect(Object.values(values).reduce((sum, value) => sum + value, 0)).toBe(100);
+    expect(values).toEqual({
+      available: { seconds: 17_280, percentage: 40 },
+      onIntervention: { seconds: 8_640, percentage: 20 },
+      outOfService: { seconds: 8_640, percentage: 20 },
+      unknown: { seconds: 8_640, percentage: 20 },
+    });
+    expect(Object.values(values).reduce((sum, value) => sum + value.percentage, 0)).toBe(100);
+  });
+
+  it("merges adjacent periods with the same status and keeps separated periods apart", () => {
+    const periods = [
+      { ...period("0", 60), starts_at: "2026-11-23T00:00:00Z", ends_at: "2026-11-23T00:01:00Z" },
+      { ...period("0", 120), starts_at: "2026-11-23T00:01:00Z", ends_at: "2026-11-23T00:03:00Z" },
+      { ...period("6", 60), starts_at: "2026-11-23T00:03:00Z", ends_at: "2026-11-23T00:04:00Z" },
+      { ...period("0", 60), starts_at: "2026-11-23T00:05:00Z", ends_at: "2026-11-23T00:06:00Z" },
+    ];
+    const merged = mergeConsecutiveStatusPeriods(periods);
+    expect(merged).toHaveLength(3);
+    expect(merged[0]).toMatchObject({ status_code: "0", duration_seconds: 180, starts_at: "2026-11-23T00:00:00Z", ends_at: "2026-11-23T00:03:00Z" });
+    expect(merged[1].status_code).toBe("6");
+    expect(merged[2].status_code).toBe("0");
   });
 
   it("uses the required open group order and combines AMBINC with AMB", () => {

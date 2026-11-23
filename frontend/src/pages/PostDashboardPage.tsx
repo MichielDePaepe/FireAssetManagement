@@ -3,9 +3,29 @@ import { Link, useParams } from "react-router-dom";
 import { AlertCircle, ArrowLeft, Signal, SignalZero } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, subscribeToCityGIS, type CityGISSnapshot, type CityGISVector, type LocationOverview } from "@/lib/api";
-import { calculateStatusPercentages, groupPostVectors } from "@/lib/postDashboardStatus";
+import { calculateStatusSummary, groupPostVectors, mergeConsecutiveStatusPeriods } from "@/lib/postDashboardStatus";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("nl-BE", { dateStyle: "short", timeStyle: "short" });
+const statusAxisFormatter = new Intl.DateTimeFormat("nl-BE", { timeZone: "Europe/Brussels", hour: "numeric", minute: "2-digit", hourCycle: "h23" });
+
+function statusAxisTicks(startsAt: string, endsAt: string) {
+  const start = new Date(startsAt).getTime();
+  const end = new Date(endsAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return [];
+  const ticks: { position: number; label: string }[] = [];
+  const cursor = new Date(start);
+  cursor.setUTCSeconds(0, 0);
+  while (cursor.getTime() <= end) {
+    const parts = statusAxisFormatter.formatToParts(cursor);
+    const hour = Number(parts.find((part) => part.type === "hour")?.value);
+    const minute = Number(parts.find((part) => part.type === "minute")?.value);
+    if (hour % 4 === 0 && minute === 0 && cursor.getTime() >= start) {
+      ticks.push({ position: ((cursor.getTime() - start) / (end - start)) * 100, label: `${hour}u` });
+    }
+    cursor.setTime(cursor.getTime() + 60_000);
+  }
+  return ticks;
+}
 
 function formatVisibleDuration(seconds: number): string {
   const minutes = Math.max(0, Math.round(seconds / 60));
@@ -13,7 +33,6 @@ function formatVisibleDuration(seconds: number): string {
   const remainingMinutes = minutes % 60;
   return hours ? `${hours} u ${remainingMinutes} min` : `${remainingMinutes} min`;
 }
-
 function mergeLiveVectors(overview: LocationOverview, snapshot: CityGISSnapshot): LocationOverview {
   const liveById = new Map(snapshot.vectors.map((vector) => [vector.id, vector]));
   return {
@@ -115,51 +134,71 @@ export function PostDashboardPage() {
           {groups.map((group) => <section key={group.key} aria-label={`Vectortype ${group.key}`} className="space-y-3">
             {group.key === "Overige" ? <details className="border bg-white p-4">
               <summary className="cursor-pointer font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Overige vectortypes ({group.vectors.length})</summary>
-              <div className="mt-3 space-y-3">{group.vectors.map((vector) => <VectorCard key={vector.id} vector={vector} windowSeconds={windowSeconds} />)}</div>
+              <div className="mt-3 space-y-3">{group.vectors.map((vector) => <VectorCard key={vector.id} vector={vector} windowSeconds={windowSeconds} windowStartsAt={overview.status_window.starts_at} windowEndsAt={overview.status_window.ends_at} />)}</div>
             </details> : <>
               <h2 className="border-b pb-2 text-lg font-semibold">{group.key}</h2>
-              {group.vectors.map((vector) => <VectorCard key={vector.id} vector={vector} windowSeconds={windowSeconds} />)}
+              {group.vectors.map((vector) => <VectorCard key={vector.id} vector={vector} windowSeconds={windowSeconds} windowStartsAt={overview.status_window.starts_at} windowEndsAt={overview.status_window.ends_at} />)}
             </>}
           </section>)}
         </div>}
   </main>;
 }
 
-function VectorCard({ vector, windowSeconds }: { vector: LocationOverview["vectors"][number]; windowSeconds: number }) {
-  const percentages = calculateStatusPercentages(vector.status_periods, windowSeconds);
+function VectorCard({ vector, windowSeconds, windowStartsAt, windowEndsAt }: { vector: LocationOverview["vectors"][number]; windowSeconds: number; windowStartsAt: string; windowEndsAt: string }) {
+  const statusSummary = calculateStatusSummary(vector.status_periods, windowSeconds);
+  const statusPeriods = mergeConsecutiveStatusPeriods(vector.status_periods);
+  const percentageRows = [
+    { label: "Beschikbaar", ...statusSummary.available },
+    { label: "Op interventie", ...statusSummary.onIntervention },
+    { label: "Buiten dienst", ...statusSummary.outOfService },
+    { label: "Onbekend", ...statusSummary.unknown },
+  ].filter((item) => item.percentage > 0);
+  const axisTicks = statusAxisTicks(windowStartsAt, windowEndsAt);
   return <article className="border bg-white p-4 shadow-sm">
-            <header className="flex flex-wrap items-start justify-between gap-3 border-b pb-3">
-              <div>
+            <header className="flex items-center gap-3 border-b pb-3">
+              <span
+                role="img"
+                aria-label={`Huidige status ${vector.operational_status_code || "?"} · ${vector.status_description || "Onbekende status"}`}
+                title={`Huidige status ${vector.operational_status_code || "?"} · ${vector.status_description || "Onbekende status"}`}
+                className="h-10 w-[6px] shrink-0 rounded-none"
+                style={{ backgroundColor: vector.status_color ?? "#E5E7EB" }}
+              />
+              <div className="min-w-0">
                 <h2 className="text-lg font-semibold">{vector.abbreviation || vector.name || vector.vector_code}</h2>
-                <p className="text-sm text-muted-foreground">{vector.resource_type_code || "Onbekend type"} · {vehicleDescription(vector)}</p>
+                <p className="text-sm text-muted-foreground">{vehicleDescription(vector)}</p>
               </div>
-              <p className="border px-2 py-1 text-sm" style={{ borderColor: vector.status_color ?? undefined }}>
-                {vector.operational_status_code || "?"} · {vector.status_description || "Onbekende status"}
-              </p>
             </header>
             <section aria-label={`Statusverloop laatste 24 uur voor ${vector.vector_code}`} className="mt-4">
               <h3 className="text-sm font-semibold">Statusverloop · laatste 24 uur</h3>
-              <div role="group" aria-label={`Statusperioden van ${vector.vector_code}`} className="mt-2 flex h-7 overflow-hidden border bg-muted/20">
-                {vector.status_periods.map((period, index) => {
+              <div className="mt-2 grid grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+                <div className="min-w-0">
+                <div role="group" aria-label={`Statusperioden van ${vector.vector_code}`} className="!rounded-none flex h-7 min-w-0 overflow-visible border bg-muted/20">
+                {statusPeriods.map((period, index) => {
                   const status = period.is_unknown ? "Onbekend" : `${period.status_code ?? "?"} · ${period.status_description ?? period.status_abbreviation ?? "Status"}`;
                   const starts = dateTimeFormatter.format(new Date(period.starts_at));
                   const ends = dateTimeFormatter.format(new Date(period.ends_at));
                   const duration = formatVisibleDuration(period.duration_seconds);
+                  const warnLongStatusOne = period.status_code === "1" && period.duration_seconds > 180;
                   return <button
                     key={`${period.starts_at}-${period.ends_at}-${index}`}
                     type="button"
-                    aria-label={`${status}, ${duration}, van ${starts} tot ${ends}`}
-                    title={`${status} · ${duration} · ${starts} – ${ends}`}
-                    className="min-w-[2px] border-r border-white focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`${status}, ${duration}, van ${starts} tot ${ends}${warnLongStatusOne ? ", waarschuwing: status 1 duurde langer dan 3 minuten" : ""}`}
+                    title={`${status} · ${duration} · ${starts} – ${ends}${warnLongStatusOne ? " · Waarschuwing: status 1 duurde langer dan 3 minuten" : ""}`}
+                    className={`!rounded-none relative min-w-[2px] border-r border-white focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring${warnLongStatusOne ? " z-10" : ""}`}
                     style={{ flexGrow: Math.max(0, period.duration_seconds), flexBasis: 0, background: period.is_unknown ? "repeating-linear-gradient(135deg, #e5e7eb, #e5e7eb 5px, #f8fafc 5px, #f8fafc 10px)" : period.status_color ?? "#9ca3af" }}
-                  />;
+                  >{warnLongStatusOne && <span aria-hidden="true" className="pointer-events-none absolute -top-4 left-1/2 z-20 grid h-4 w-4 -translate-x-1/2 place-items-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white ring-2 ring-white">!</span>}</button>;
                 })}
               </div>
-              <div className="mt-2 grid gap-2 text-xs sm:grid-cols-4">
-                <Percentage label="Beschikbaar" value={percentages.available} />
-                <Percentage label="Andere status <90" value={percentages.other} />
-                <Percentage label="Status 90+" value={percentages.outOfService} />
-                <Percentage label="Onbekend" value={percentages.unknown} />
+                <div aria-hidden="true" className="relative mt-1 h-4 text-[10px] leading-4 text-muted-foreground/70">
+                  {axisTicks.map(({ position, label }, index) => <span key={`${position}-${label}`} className="absolute top-0 whitespace-nowrap" style={{ left: `${position}%`, transform: `translateX(${index === 0 ? "0" : index === axisTicks.length - 1 ? "-100%" : "-50%"})` }}>{label}</span>)}
+                </div>
+                </div>
+                <ul aria-label="Statuspercentages" className="flex flex-col gap-1 text-xs">
+                  {percentageRows.map(({ label, percentage, seconds }) => <li key={label} className="flex justify-between gap-2 border-b pb-1 last:border-b-0">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="shrink-0 font-medium text-foreground">{percentage}% · {formatVisibleDuration(seconds)}</span>
+                  </li>)}
+                </ul>
               </div>
             </section>
             <div className="mt-3 grid gap-4 sm:grid-cols-3">
@@ -180,8 +219,4 @@ function VectorCard({ vector, windowSeconds }: { vector: LocationOverview["vecto
               </section>
             </div>
   </article>;
-}
-
-function Percentage({ label, value }: { label: string; value: number }) {
-  return <p className="border px-2 py-1 text-muted-foreground"><span className="font-medium text-foreground">{value}%</span> {label}</p>;
 }

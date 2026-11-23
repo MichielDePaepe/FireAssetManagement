@@ -1,35 +1,47 @@
 import type { CityGISPostVector, CityGISStatusPeriod } from "@/lib/api";
 
-export type StatusPercentages = {
-  available: number;
-  other: number;
-  outOfService: number;
-  unknown: number;
+export type StatusSummary = {
+  available: { seconds: number; percentage: number };
+  onIntervention: { seconds: number; percentage: number };
+  outOfService: { seconds: number; percentage: number };
+  unknown: { seconds: number; percentage: number };
 };
 
-type PercentageKey = keyof StatusPercentages;
-const percentageKeys: PercentageKey[] = ["available", "other", "outOfService", "unknown"];
+type StatusCategory = keyof StatusSummary;
+const statusCategories: StatusCategory[] = ["available", "onIntervention", "outOfService", "unknown"];
 const displayTypes = ["APM", "AE", "CMD", "MSERV", "FAUB", "AMB"];
 const collator = new Intl.Collator("nl-BE", { numeric: true, sensitivity: "base" });
 
-export function calculateStatusPercentages(
+export function calculateStatusSummary(
   periods: CityGISStatusPeriod[],
   windowSeconds: number,
-): StatusPercentages {
-  const seconds: StatusPercentages = { available: 0, other: 0, outOfService: 0, unknown: 0 };
+): StatusSummary {
+  const seconds: Record<StatusCategory, number> = {
+    available: 0,
+    onIntervention: 0,
+    outOfService: 0,
+    unknown: 0,
+  };
   for (const period of periods) {
     const duration = Math.max(0, period.duration_seconds);
     if (period.is_unknown) seconds.unknown += duration;
     else if (period.status_code === "0" || period.status_code === "6") seconds.available += duration;
     else if (Number.isFinite(Number(period.status_code)) && Number(period.status_code) >= 90) seconds.outOfService += duration;
-    else seconds.other += duration;
+    else seconds.onIntervention += duration;
   }
 
-  if (windowSeconds <= 0) return { available: 0, other: 0, outOfService: 0, unknown: 100 };
+  if (windowSeconds <= 0) {
+    return {
+      available: { seconds: 0, percentage: 0 },
+      onIntervention: { seconds: 0, percentage: 0 },
+      outOfService: { seconds: 0, percentage: 0 },
+      unknown: { seconds: 0, percentage: 100 },
+    };
+  }
   const knownTotal = Object.values(seconds).reduce((sum, value) => sum + value, 0);
   if (knownTotal < windowSeconds) seconds.unknown += windowSeconds - knownTotal;
   const measuredTotal = Object.values(seconds).reduce((sum, value) => sum + value, 0);
-  const exact = percentageKeys.map((key) => seconds[key] / measuredTotal * 100);
+  const exact = statusCategories.map((key) => seconds[key] / measuredTotal * 100);
   const values = exact.map(Math.floor);
   let remaining = 100 - values.reduce((sum, value) => sum + value, 0);
   const byRemainder = exact
@@ -40,7 +52,28 @@ export function calculateStatusPercentages(
     values[item.index] += 1;
     remaining -= 1;
   }
-  return Object.fromEntries(percentageKeys.map((key, index) => [key, values[index]])) as StatusPercentages;
+  return Object.fromEntries(statusCategories.map((key, index) => [key, {
+    seconds: seconds[key],
+    percentage: values[index],
+  }])) as StatusSummary;
+}
+
+export function mergeConsecutiveStatusPeriods(periods: CityGISStatusPeriod[]): CityGISStatusPeriod[] {
+  return periods.reduce<CityGISStatusPeriod[]>((merged, period) => {
+    const previous = merged.at(-1);
+    const sameStatus = previous
+      && previous.status_code === period.status_code
+      && previous.is_unknown === period.is_unknown;
+    const adjacent = previous
+      && new Date(previous.ends_at).getTime() === new Date(period.starts_at).getTime();
+    if (previous && sameStatus && adjacent) {
+      previous.ends_at = period.ends_at;
+      previous.duration_seconds += period.duration_seconds;
+    } else {
+      merged.push({ ...period });
+    }
+    return merged;
+  }, []);
 }
 
 export function groupPostVectors(vectors: CityGISPostVector[]) {
