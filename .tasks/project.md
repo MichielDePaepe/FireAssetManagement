@@ -1,7 +1,7 @@
 ---
 title: Fire Asset Management
-status: done
-current-phase: 31
+status: in-progress
+current-phase: 32
 repo: private
 github: ~
 created: 2026-11-14
@@ -41,6 +41,9 @@ Add a staff-managed label-printer module to the pager asset application. Initial
 - [x] Phase 29: Documentatie en verificatie
 - [x] Phase 30: Postenoverzicht op het dashboard
 - [x] Phase 31: Dashboardverificatie en documentatie
+- [ ] Phase 32: Postdashboardgegevens
+- [ ] Phase 33: Postdashboardinterface
+- [ ] Phase 34: Verificatie en documentatie
 
 ## Specs
 - specs/2026-11-13-labelprinter-module.md (bootstrap) → phases 1-2
@@ -54,3 +57,4 @@ Add a staff-managed label-printer module to the pager asset application. Initial
 - specs/2026-11-21-fireplan-inventaris-detailpagina.md (extension) → phases 24-25
 - specs/2026-11-21-radiobeheer.md (extension) → phases 26-29
 - specs/2026-11-22-dashboard-postenoverzicht.md (extension) → phases 30-31
+- specs/2026-11-23-postdashboard-per-post.md (extension) → phases 32-34
