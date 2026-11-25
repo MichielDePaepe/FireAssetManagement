@@ -1,9 +1,9 @@
 ---
 phase: 38
 title: Suivo push en dagelijkse reconciliatie
-status: open
+status: closed
 opened: 2026-11-25
-closed: ~
+closed: 2026-11-25
 ---
 ## Carry from phase 37
 1. Trackers page and staff-only snapshot endpoints are in place. Unit matching is exact after trim/case-folding; ambiguity remains unlinked.
@@ -26,6 +26,12 @@ Verwerk Suivo-unitstatusupdates bijna direct en herstel gemiste updates met een 
 - Tests dekken push-authenticatie, subscription, statusupdates, ping, reconnect, idempotentie, taakvoortgang, schedulerconfiguratie en handmatige refresh.
 
 ## Tasks
-- [ ] task-01-suivo-websocket-consumer-and-idempotent-push.md
-- [ ] task-02-daily-reconciliation-and-manual-refresh-ui.md
-- [ ] task-03-compose-health-and-phase-verification.md
+- [x] task-01-suivo-websocket-consumer-and-idempotent-push.md
+- [x] task-02-daily-reconciliation-and-manual-refresh-ui.md
+- [x] task-03-compose-health-and-phase-verification.md
+
+## Completion Notes
+- One `suivo-consumer` is running healthy; live status messages are current and no raw credentials or payloads are logged.
+- Celery Beat is running with a persistent scheduler file at `/var/lib/celerybeat/celerybeat-schedule`; the schedule volume and dev override were verified.
+- Full checks: backend pytest 294 passed / 1 Redis-broker test skipped (live broker opt-in); Ruff, migrations check, Compose config and `git diff --check` passed. Frontend Vitest 153 passed; TypeScript and ESLint passed.
+- The browser host was unavailable for screenshot QA; component tests passed. Redis-gated Celery/SSE integration remains an optional follow-up.

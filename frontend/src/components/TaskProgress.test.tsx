@@ -65,3 +65,16 @@ describe("TaskProgress", () => {
     expect(onOpenReport).toHaveBeenCalledOnce();
   });
 });
+
+it("shows the Suivo reconciliation result counts", () => {
+  render(<TaskProgress task={{
+    ...task,
+    task_name: "suivo.sync",
+    status: "SUCCESS",
+    progress: null,
+    result: { message: "Suivo-gegevens vernieuwd.", units: 200, devices: 182, statuses: 200 },
+  }} />);
+  expect(screen.getByText("Assets").parentElement).toHaveTextContent("200");
+  expect(screen.getByText("Trackers").parentElement).toHaveTextContent("182");
+  expect(screen.getByText("Statusrecords").parentElement).toHaveTextContent("200");
+});

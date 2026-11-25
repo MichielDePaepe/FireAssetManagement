@@ -1,5 +1,5 @@
 import { CheckCircle2, CircleAlert, LoaderCircle } from "lucide-react";
-import type { FireplanInventorySyncResult, FireplanRadioSyncResult, FireplanSyncResult, TaskSnapshot } from "@/lib/api";
+import type { FireplanInventorySyncResult, FireplanRadioSyncResult, FireplanSyncResult, SuivoSyncResult, TaskSnapshot } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -22,6 +22,10 @@ function isFireplanInventoryResult(task: TaskSnapshot): task is TaskSnapshot & {
 
 function isFireplanRadioResult(task: TaskSnapshot): task is TaskSnapshot & { result: FireplanRadioSyncResult } {
   return task.task_name === "fireplan.sync_radios" && Boolean(task.result && "skipped" in task.result);
+}
+
+function isSuivoResult(task: TaskSnapshot): task is TaskSnapshot & { result: SuivoSyncResult } {
+  return task.task_name === "suivo.sync" && Boolean(task.result && "units" in task.result);
 }
 
 export function TaskProgress({
@@ -81,6 +85,16 @@ export function TaskProgress({
             </li>)}
           </ul>}
           {onOpenReport && <Button variant="outline" onClick={onOpenReport}>Synchronisatierapport bekijken</Button>}
+        </div>
+      )}
+      {isSuivoResult(task) && (
+        <div className="space-y-4 border bg-muted/20 p-4">
+          <h3 className="font-medium">Suivo-syncresultaat</h3>
+          <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+            <div><dt className="text-muted-foreground">Assets</dt><dd className="mt-1 font-semibold">{task.result.units}</dd></div>
+            <div><dt className="text-muted-foreground">Trackers</dt><dd className="mt-1 font-semibold">{task.result.devices}</dd></div>
+            <div><dt className="text-muted-foreground">Statusrecords</dt><dd className="mt-1 font-semibold">{task.result.statuses}</dd></div>
+          </dl>
         </div>
       )}
       {isFireplanInventoryResult(task) && (

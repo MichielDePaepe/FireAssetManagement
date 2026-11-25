@@ -6,6 +6,7 @@ const taskLabels: Record<string, string> = {
   "fireplan.sync_radios": "FirePlan-radiosynchronisatie",
   "fireplan.sync_inventories": "FirePlan-inventarissynchronisatie",
   "citygis.refresh": "CityGIS-synchronisatie",
+  "suivo.sync": "Suivo-synchronisatie",
 };
 
 const statusLabels: Record<TaskStatus, string> = {

@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
+from celery.schedules import crontab
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -140,6 +142,7 @@ CELERY_TASK_DEFAULT_RETRY_DELAY = int(os.getenv("CELERY_TASK_DEFAULT_RETRY_DELAY
 CELERY_TASK_MAX_RETRIES = int(os.getenv("CELERY_TASK_MAX_RETRIES", "3"))
 CELERY_RESULT_EXTENDED = True
 CELERY_RESULT_EXPIRES = int(os.getenv("CELERY_RESULT_EXPIRES", "604800"))
+CELERY_TIMEZONE = "Europe/Brussels"
 CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600}
 CELERY_BEAT_SCHEDULE = {
     "citygis-refresh-every-minute": {
@@ -149,6 +152,11 @@ CELERY_BEAT_SCHEDULE = {
     "fireplan-inventory-sync-hourly": {
         "task": "fireplan.sync_inventories",
         "schedule": 3600.0,
+        "options": {"ignore_result": True},
+    },
+    "suivo-sync-daily": {
+        "task": "suivo.sync",
+        "schedule": crontab(hour=3, minute=0),
         "options": {"ignore_result": True},
     },
 }

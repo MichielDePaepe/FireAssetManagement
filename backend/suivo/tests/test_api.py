@@ -82,3 +82,20 @@ def test_asset_response_keeps_explicit_battery_level_and_voltage_separate():
     row = response.data["results"][0]
     assert row["battery_level"] == 67
     assert row["battery_voltage"] == 12.4
+
+
+@pytest.mark.django_db
+def test_sync_status_exposes_only_safe_websocket_health_fields():
+    from suivo.models import SuivoSyncState
+
+    SuivoSyncState.objects.create(
+        pk=1,
+        push_last_error="ConnectionError; reconnecting",
+    )
+    client = APIClient()
+    client.force_authenticate(get_user_model().objects.create_user("status-admin", is_staff=True))
+    response = client.get("/api/suivo/sync/")
+    assert response.status_code == 200
+    assert response.data["push_last_error"] == "ConnectionError; reconnecting"
+    assert "access_token" not in response.data
+    assert "payload" not in response.data

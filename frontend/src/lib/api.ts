@@ -12,9 +12,16 @@ export interface TaskSnapshot {
   task_name: string | null;
   status: TaskStatus;
   progress: TaskProgress | null;
-  result: ExampleTaskResult | FireplanSyncResult | FireplanRadioSyncResult | FireplanInventorySyncResult | null;
+  result: ExampleTaskResult | FireplanSyncResult | FireplanRadioSyncResult | FireplanInventorySyncResult | SuivoSyncResult | null;
   error: string | null;
   updated_at: string | null;
+}
+
+export interface SuivoSyncResult {
+  message?: string;
+  units: number;
+  devices: number;
+  statuses: number;
 }
 
 export interface ExampleTaskResult {
@@ -177,6 +184,9 @@ export interface SuivoList<T> {
   results: T[];
   last_succeeded_at: string | null;
   last_error: string;
+  push_connected: boolean;
+  push_last_message_at: string | null;
+  push_last_error: string;
   stale: boolean;
 }
 
@@ -542,6 +552,7 @@ export const api = {
   getCityGISVectorStatusHistory: (vectorId: number) =>
     request<CityGISVectorStatusHistoryItem[]>(`/citygis/vectors/${vectorId}/status-history/`),
   startCityGISRefresh: () => request<StartedTask>("/citygis/refresh/", { method: "POST" }),
+  startSuivoSync: () => request<StartedTask>("/suivo/sync/", { method: "POST" }),
   cityGISEventsUrl: () => `${API_BASE}/citygis/events/`,
   startTask: (duration_seconds: number) =>
     request<StartedTask>("/tasks/", { method: "POST", body: JSON.stringify({ duration_seconds }) }),

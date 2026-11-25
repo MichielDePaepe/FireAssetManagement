@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import status
@@ -28,10 +30,19 @@ def _explicit_value(value, names):
 def _sync_metadata():
     state = SuivoSyncState.objects.filter(pk=1).first()
     has_snapshot = SuivoUnit.objects.exists() or SuivoDevice.objects.exists()
+    push_connected = bool(
+        state
+        and state.push_connected_at
+        and state.push_last_message_at
+        and state.push_last_message_at >= timezone.now() - timedelta(seconds=90)
+    )
     return {
         "last_succeeded_at": state.last_succeeded_at if state else None,
         "last_error": state.last_error if state else "",
-        "stale": bool(state and state.last_error and has_snapshot),
+        "push_connected": push_connected,
+        "push_last_message_at": state.push_last_message_at if state else None,
+        "push_last_error": state.push_last_error if state else "",
+        "stale": bool(has_snapshot and ((state and state.last_error) or not push_connected)),
     }
 
 
@@ -134,6 +145,10 @@ class SuivoSyncView(APIView):
                 "last_attempted_at": state.last_attempted_at if state else None,
                 "last_succeeded_at": state.last_succeeded_at if state else None,
                 "last_error": state.last_error if state else "",
+                "push_connected_at": state.push_connected_at if state else None,
+                "push_last_message_at": state.push_last_message_at if state else None,
+                "push_last_error": state.push_last_error if state else "",
+                "push_retry_at": state.push_retry_at if state else None,
                 "unit_count": SuivoUnit.objects.count(),
                 "device_count": SuivoDevice.objects.count(),
             }

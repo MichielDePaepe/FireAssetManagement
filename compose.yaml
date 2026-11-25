@@ -52,6 +52,28 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  suivo-consumer:
+    build:
+      context: ./backend
+      target: production
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: ${PYTHON_PACKAGE:-config}.settings
+      DJANGO_DEBUG: "false"
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    command: ["python", "manage.py", "suivo_consumer"]
+    depends_on:
+      api:
+        condition: service_healthy
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "suivo_consumer_health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+
   beat:
     build:
       context: ./backend
@@ -63,7 +85,9 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: django-db
-    command: ["celery", "-A", "${PYTHON_PACKAGE:-config}", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+    command: ["celery", "-A", "${PYTHON_PACKAGE:-config}", "beat", "--loglevel=INFO", "--schedule=/var/lib/celerybeat/celerybeat-schedule"]
+    volumes:
+      - celerybeat_data:/var/lib/celerybeat
     depends_on:
       api:
         condition: service_healthy
@@ -150,3 +174,4 @@ volumes:
     external: true
     name: fire-asset-management_redis_data
   django_static: {}
+  celerybeat_data: {}

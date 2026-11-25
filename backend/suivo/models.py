@@ -34,6 +34,10 @@ class SuivoSyncState(models.Model):
     last_attempted_at = models.DateTimeField(null=True, blank=True)
     last_succeeded_at = models.DateTimeField(null=True, blank=True)
     last_error = models.TextField(blank=True)
+    push_connected_at = models.DateTimeField(null=True, blank=True)
+    push_last_message_at = models.DateTimeField(null=True, blank=True)
+    push_last_error = models.CharField(max_length=160, blank=True)
+    push_retry_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:

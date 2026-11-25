@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type SuivoAsset } from "@/lib/api";
 import { SuivoTrackersPage } from "@/pages/SuivoTrackersPage";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/api")>(),
-  api: { getSuivoAssets: vi.fn(), getSuivoDevices: vi.fn() },
+  api: { getSuivoAssets: vi.fn(), getSuivoDevices: vi.fn(), startSuivoSync: vi.fn() },
 }));
 
 const asset: SuivoAsset = {
@@ -16,7 +16,7 @@ const asset: SuivoAsset = {
   last_seen_at: "2026-11-25T10:00:00Z", position_at: "2026-11-25T09:59:00Z",
   position: { address: { city: "Brussels" } }, battery_level: null, battery_voltage: null,
 };
-const emptyMeta = { last_succeeded_at: "2026-11-25T10:00:00Z", last_error: "", stale: false };
+const emptyMeta = { last_succeeded_at: "2026-11-25T10:00:00Z", last_error: "", push_connected: true, push_last_message_at: "2026-11-25T10:00:00Z", push_last_error: "", stale: false };
 
 beforeEach(() => {
   vi.mocked(api.getSuivoAssets).mockResolvedValue({ results: [asset], ...emptyMeta });
@@ -47,7 +47,7 @@ describe("SuivoTrackersPage", () => {
   });
 
   it("shows a stale-data notice and supports search", async () => {
-    vi.mocked(api.getSuivoAssets).mockResolvedValue({ results: [asset], ...emptyMeta, stale: true, last_error: "Bron tijdelijk niet bereikbaar." });
+    vi.mocked(api.getSuivoAssets).mockResolvedValue({ results: [asset], ...emptyMeta, stale: true, last_error: "", push_connected: false, push_last_error: "ConnectionError; reconnecting" });
     render(<MemoryRouter><SuivoTrackersPage /></MemoryRouter>);
     expect(await screen.findByRole("status")).toHaveTextContent(/verouderd/i);
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "missing" } });
@@ -73,4 +73,17 @@ it("announces the loading state", () => {
   vi.mocked(api.getSuivoDevices).mockReturnValue(new Promise(() => undefined));
   render(<MemoryRouter><SuivoTrackersPage /></MemoryRouter>);
   expect(screen.getByText("Suivo-gegevens laden…")).toBeInTheDocument();
+});
+
+
+it("starts the full refresh and opens the existing task progress route", async () => {
+  vi.mocked(api.startSuivoSync).mockResolvedValue({ task_id: "suivo-task-1", status: "PENDING" });
+  function TaskRoute() { const { taskId } = useParams(); return <p>Task view {taskId}</p>; }
+  render(<MemoryRouter initialEntries={["/trackers"]}><Routes>
+    <Route path="/trackers" element={<SuivoTrackersPage />} />
+    <Route path="/tasks/:taskId" element={<TaskRoute />} />
+  </Routes></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: /alles vernieuwen/i }));
+  expect(await screen.findByText("Task view suivo-task-1")).toBeInTheDocument();
+  expect(api.startSuivoSync).toHaveBeenCalledOnce();
 });

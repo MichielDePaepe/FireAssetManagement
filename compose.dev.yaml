@@ -27,13 +27,24 @@ services:
         condition: service_healthy
     stop_grace_period: 2m
 
+  suivo-consumer:
+    build:
+      context: ./backend
+      target: development
+    volumes:
+      - ./backend:/app
+    environment:
+      DJANGO_DEBUG: "true"
+      DJANGO_SECURE_COOKIES: "false"
+
   beat:
     build:
       context: ./backend
       target: development
     volumes:
       - ./backend:/app
-    command: ["celery", "-A", "${PYTHON_PACKAGE:-config}", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+      - celerybeat_data:/var/lib/celerybeat
+    command: ["celery", "-A", "${PYTHON_PACKAGE:-config}", "beat", "--loglevel=INFO", "--schedule=/var/lib/celerybeat/celerybeat-schedule"]
     environment:
       DJANGO_DEBUG: "true"
       DJANGO_SECURE_COOKIES: "false"

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowDownUp, ArrowUp, Search } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowDown, ArrowDownUp, ArrowUp, RefreshCw, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, type SuivoAsset, type SuivoDevice, type SuivoList } from "@/lib/api";
 
@@ -73,8 +75,10 @@ function DeviceValue({ row, column }: { row: SuivoDevice; column: SortColumn }):
 
 function SnapshotState({ snapshot }: { snapshot: SuivoList<unknown> | null }) {
   if (!snapshot) return null;
-  return <div className="space-y-2">{snapshot.stale && <p role="status" className="border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">De Suivo-snapshot is verouderd. De laatst geslaagde gegevens blijven zichtbaar. {snapshot.last_error}</p>}
-    <p className="text-xs text-muted-foreground">Laatste volledige sync: {formatDate(snapshot.last_succeeded_at)}</p></div>;
+  const connectionMessage = snapshot.push_connected ? "Realtimeverbinding actief" : "Realtimeverbinding onderbroken";
+  const staleReason = snapshot.push_connected ? snapshot.last_error : snapshot.push_last_error || "De laatste pushstatus is niet actueel.";
+  return <div className="space-y-2">{snapshot.stale && <p role="status" className="border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">De Suivo-snapshot kan verouderd zijn. De laatst opgeslagen gegevens en bron-tijdstempels blijven zichtbaar. {staleReason}</p>}
+    <p className="text-xs text-muted-foreground">Laatste volledige sync: {formatDate(snapshot.last_succeeded_at)} · {connectionMessage} · Laatste push: {formatDate(snapshot.push_last_message_at)}</p></div>;
 }
 
 function SortHeader({ label, column, sort, onSort }: { label: string; column: SortColumn; sort: { column: SortColumn; direction: SortDirection }; onSort: (column: SortColumn) => void }) {
@@ -88,10 +92,13 @@ function SortHeader({ label, column, sort, onSort }: { label: string; column: So
 }
 
 export function SuivoTrackersPage() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("assets");
   const [assets, setAssets] = useState<SuivoList<SuivoAsset> | null>(null);
   const [devices, setDevices] = useState<SuivoList<SuivoDevice> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [syncError, setSyncError] = useState("");
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ column: SortColumn; direction: SortDirection }>({ column: "name", direction: "ascending" });
@@ -127,8 +134,23 @@ export function SuivoTrackersPage() {
     ? [["name", "Asset", "16%"], ["vehicle", "FAM-voertuig", "14%"], ["device", "Tracker", "14%"], ["type", "Type", "10%"], ["last_seen", "Laatst gehoord", "12%"], ["position_at", "Positietijd", "12%"], ["position", "Laatste locatie", "12%"], ["battery_level", "Batterijniveau (%)", "6%"], ["battery_voltage", "Spanning (V)", "4%"]]
     : [["name", "Device-identificatie", "20%"], ["type", "Type", "14%"], ["vehicle", "Asset", "16%"], ["last_seen", "Laatst gehoord", "13%"], ["position_at", "Positietijd", "13%"], ["position", "Laatste locatie", "14%"], ["battery_level", "Batterijniveau", "5%"], ["battery_voltage", "Spanning (V)", "5%"]];
 
+  const startRefresh = async () => {
+    setRefreshing(true);
+    setSyncError("");
+    try {
+      const task = await api.startSuivoSync();
+      navigate(`/tasks/${encodeURIComponent(task.task_id)}`);
+    } catch (reason) {
+      setSyncError(reason instanceof Error ? reason.message : "De Suivo-verversing kon niet worden gestart.");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return <div className="space-y-5">
-    <div><h1 className="text-2xl font-semibold tracking-tight">Trackers</h1><p className="mt-1 text-sm text-muted-foreground">Suivo-assets en gekoppelde devices</p></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold tracking-tight">Trackers</h1><p className="mt-1 text-sm text-muted-foreground">Suivo-assets en gekoppelde devices</p></div>
+      <Button variant="outline" onClick={() => void startRefresh()} disabled={refreshing} aria-label="Alles vernieuwen" title="Start een volledige Suivo-sync"><RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Alles vernieuwen</Button>
+    </div>
     <div role="tablist" aria-label="Suivo-overzichten" className="flex border-b">
       {([["assets", "Assets"], ["devices", "Trackers"]] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} aria-controls="suivo-panel" onClick={() => { setTab(key); setQuery(""); }} className={`border-b-2 px-4 py-2 text-sm ${tab === key ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{label}</button>)}
     </div>
@@ -138,6 +160,7 @@ export function SuivoTrackersPage() {
         <div className="relative w-full sm:w-72"><Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Zoeken" type="search" placeholder="Zoeken…" value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" /></div>
       </div>
       {error && <p role="alert" className="border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">Suivo kon niet worden geladen: {error}</p>}
+      {syncError && <p role="alert" className="border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">{syncError}</p>}
       <div className="overflow-x-auto">
         <table className="w-full table-fixed border-collapse text-sm">
           <colgroup>{columns.map(([column, , width]) => <col key={column} style={{ width }} />)}</colgroup>
