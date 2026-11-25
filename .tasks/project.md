@@ -65,3 +65,6 @@ Add a staff-managed label-printer module to the pager asset application. Initial
 - specs/2026-11-23-postdashboard-per-post.md (extension) → phases 32-34
 - specs/2026-11-23-fireplan-inventaris-radio-koppeling.md (extension) → phase 35
 - specs/2026-11-25-suivo-trackerintegratie.md (extension) → phases 36-39
+
+## Approved clarifications
+- 2026-11-25: Phase 36 also reads `SUIVO_BASE_URL` and `SUIVO_WSS_URL` from `.env`; `.env.example` documents the Suivo REST and WebSocket defaults.
