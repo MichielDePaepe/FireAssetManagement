@@ -1,7 +1,7 @@
 ---
 title: Fire Asset Management
 status: in-progress
-current-phase: 36
+current-phase: 37
 repo: private
 github: ~
 created: 2026-11-14
@@ -45,7 +45,7 @@ Add a staff-managed label-printer module to the pager asset application. Initial
 - [x] Phase 33: Postdashboardinterface
 - [x] Phase 34: Verificatie en documentatie
 - [x] Phase 35: Radio-assets koppelen aan FirePlan-inventarissen
-- [ ] Phase 36: Suivo API en actuele kopie
+- [x] Phase 36: Suivo API en actuele kopie
 - [ ] Phase 37: Tracker- en assetoverzichten
 - [ ] Phase 38: Suivo push en dagelijkse reconciliatie
 - [ ] Phase 39: Accountvalidatie en documentatie

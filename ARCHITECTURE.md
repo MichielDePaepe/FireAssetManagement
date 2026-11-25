@@ -132,7 +132,7 @@ The staff-only **Inventaris** page reads `/api/inventory/`. Staff choose Pagers,
 
 Django connects to PostgreSQL using `DATABASE_URL`. Django migrations create the framework tables and the `django_celery_results_taskresult` table. The Celery result backend is `django-db`, so task IDs, states, progress metadata, tracebacks, and final results are stored there. There is no parallel task model.
 
-The API uses Celery's task ID directly. A newly queued task can report `PENDING` until a worker records a state. The task list reads recent `TaskResult` rows named `tasks.example_task`, `fireplan.sync_pagers`, `fireplan.sync_inventories`, or `citygis.refresh`; the currently active IDs are kept in browser local storage so a route can be restored after navigation or refresh. There is no result-cleanup scheduler in the starter, so rows remain stored until an application-specific cleanup policy is added. `CELERY_RESULT_EXPIRES` does not remove rows by itself without Celery Beat or another cleanup schedule.
+The API uses Celery's task ID directly. A newly queued task can report `PENDING` until a worker records a state. The task list reads recent `TaskResult` rows named `tasks.example_task`, `fireplan.sync_pagers`, `fireplan.sync_inventories`, `citygis.refresh`, or `suivo.sync`; the currently active IDs are kept in browser local storage so a route can be restored after navigation or refresh. There is no result-cleanup scheduler in the starter, so rows remain stored until an application-specific cleanup policy is added. `CELERY_RESULT_EXPIRES` does not remove rows by itself without Celery Beat or another cleanup schedule.
 
 ## Task execution and recovery
 
@@ -186,3 +186,8 @@ The `make deploy` target connects to a configured production host over SSH, requ
 Task exceptions become Celery failure states and are visible in the API and Flower. Runtime errors retry with bounded exponential backoff and jitter; other exceptions fail without automatic retry. Task time limits prevent indefinitely running example tasks. Logs are emitted as structured JSON to container stdout/stderr.
 
 PostgreSQL remains the authoritative store for status, progress, results, and failure tracebacks. Redis stores queued broker messages; its AOF volume and service restart policy help retain them across process/container restarts. A worker lost with an unacknowledged task may cause re-execution; a task is never described as automatically resuming at the last progress update. Tasks whose failure is recorded can be found in the task list and Flower. A message lost through an unrecoverable Redis-volume loss cannot be recovered by PostgreSQL because a result row exists only after a worker records task state.
+
+
+## Suivo snapshot
+
+Suivo Client Credentials are read from `SUIVO_CLIENT_ID` and `SUIVO_CLIENT_SECRET`; `SUIVO_BASE_URL` and `SUIVO_WSS_URL` configure REST and WebSocket origins. The `suivo.sync` task fetches all REST resources before atomically upserting units, devices and available unit status. A singleton sync state records attempt/success times and a safe error string. Source IDs are retained and omitted records are not deleted. Request or mapping failures leave the previous snapshot intact. Manual task progress and results use the existing Celery, `celery-progress`, django-celery-results and task SSE path. The task list is single-tenant and PostgreSQL-backed; SSE polls stored task snapshots once per second.

@@ -17,6 +17,7 @@ urlpatterns = [
     path("api/", include("fireplan.urls")),
     path("api/", include("printers.urls")),
     path("api/", include("citygis.urls")),
+    path("api/", include("suivo.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
 ]

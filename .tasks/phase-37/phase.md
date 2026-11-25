@@ -1,10 +1,17 @@
 ---
 phase: 37
 title: Tracker- en assetoverzichten
-status: pending
-opened: ~
+status: open
+opened: 2026-11-25
 closed: ~
 ---
+## Carry from phase 36
+1. Suivo account OAuth was confirmed on 2026-11-25: 200 units, 182 devices, 8 without a unit, two device types, and 200 matching unit-status rows. 195 rows had `last-seen`, 193 had a position, and no battery-named status field appeared in the sample. Unlinked `/devices` rows exposed only identity/type fields. Recheck availability during phase 39; do not claim unavailable fields as present.
+2. Live payloads use numeric `@id`, device `@imei`, and nested unit objects. Keep support for these actual response shapes when mapping identifiers.
+
+## Open follow-ups from phase 36
+- Optional Redis-gated Celery/SSE integration test from phase 35 remains unverified because no live broker test was run.
+
 ## Goal
 Toon alle Suivo-assets en devices in twee overzichtstabellen en koppel Suivo-units automatisch aan FAM-voertuigen op naam.
 
@@ -17,3 +24,6 @@ Toon alle Suivo-assets en devices in twee overzichtstabellen en koppel Suivo-uni
 - De pagina blijft read-only voor Suivo. FAM kan geen devices verplaatsen, units wijzigen of lokale trackerplaatsingen aan voertuigen/locaties vastleggen.
 
 ## Tasks
+- [ ] task-01-tracker-read-api-and-exact-vehicle-matching.md
+- [ ] task-02-tracker-overview-page-and-tables.md
+- [ ] task-03-tracker-ui-regressions-and-verification.md

@@ -25,6 +25,7 @@ TRACKED_TASK_NAMES = (
     "fireplan.sync_radios",
     "fireplan.sync_inventories",
     "citygis.refresh",
+    "suivo.sync",
 )
 
 

@@ -106,3 +106,8 @@ For pagers, the application records the identifiers and metadata needed to descr
 - Live synchronization against the configured Fireplan account remains an environment-specific verification. Fireplan supplies the QR URL; generating printable labels and adding pager detail-page label actions remain future work.
 - FirePlan `updatedAt` semantics for edits to already closed inventories remain unconfirmed. Manual inclusive period reprocessing is the supported way to refresh their details; hourly synchronization does not download all inventory detail trees.
 - Keep `FIREPLAN_CREDENTIAL_KEY` backed up and stable; existing credentials and sessions cannot be decrypted after key loss or rotation.
+
+
+## Suivo integration
+
+Suivo REST synchronization uses server-side Client Credentials (`SUIVO_CLIENT_ID`, `SUIVO_CLIENT_SECRET`) and configurable REST/WebSocket origins (`SUIVO_BASE_URL`, `SUIVO_WSS_URL`). It reads units, devices and current unit status into an idempotent local snapshot and uses the existing task, progress, result and SSE stack. Failures preserve the prior successful snapshot; source records omitted by the API are not silently deleted. Integration requests are read-only.

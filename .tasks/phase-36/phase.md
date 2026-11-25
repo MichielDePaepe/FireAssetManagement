@@ -1,9 +1,9 @@
 ---
 phase: 36
 title: Suivo API en actuele kopie
-status: pending
-opened: ~
-closed: ~
+status: closed
+opened: 2026-11-25
+closed: 2026-11-25
 ---
 ## Goal
 Verbind FAM veilig met de Suivo API en synchroniseer assets, devices en de beschikbare actuele status zonder brongegevens in Suivo te wijzigen.
@@ -22,3 +22,15 @@ Verbind FAM veilig met de Suivo API en synchroniseer assets, devices en de besch
 - Backendtests dekken OAuth-fouten zonder secrets te lekken, responsmapping, idempotente updates, onvolledige telemetry en behoud van de vorige snapshot na fouten.
 
 ## Tasks
+- [x] task-01-suivo-api-client-and-configuration.md
+- [x] task-02-snapshot-model-and-full-sync-task.md
+- [x] task-03-error-handling-and-phase-36-verification.md
+
+## Carry-forward
+
+### Carry from phase 36
+- Suivo OAuth and REST snapshot synchronization are implemented; real responses use numeric `@id`, `@imei`, and nested unit references.
+- 2026-11-25 account sample: 200 units, 182 devices (8 unlinked), two device types and 200 joined status rows. 195 rows had last-seen, 193 had position, and no battery-named telemetry field was present. Recheck before promising fields.
+
+### Open follow-ups from phase 36
+- Optional Redis-gated Celery/SSE integration test from phase 35 remains unverified because the live broker integration test was not run.

@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "fireplan",
     "printers",
     "citygis",
+    "suivo",
 ]
 
 MIDDLEWARE = [
@@ -112,6 +113,10 @@ FIREPLAN_BASE_URL = os.getenv("FIREPLAN_BASE_URL", "https://fireplan.firebru2k8.
 CITYGIS_RESOURCES_BASE_URL = os.getenv(
     "CITYGIS_RESOURCES_BASE_URL", "http://resourcesoff.firebru2k8.local"
 ).rstrip("/")
+SUIVO_BASE_URL = os.getenv("SUIVO_BASE_URL", "https://integrate.suivo.com").rstrip("/")
+SUIVO_WSS_URL = os.getenv("SUIVO_WSS_URL", "wss://integrate.suivo.com/socket")
+SUIVO_CLIENT_ID = os.getenv("SUIVO_CLIENT_ID", "")
+SUIVO_CLIENT_SECRET = os.getenv("SUIVO_CLIENT_SECRET", "")
 FIREPLAN_CREDENTIAL_KEY = os.getenv("FIREPLAN_CREDENTIAL_KEY", "")
 FIREPLAN_ALLOW_CERTIFICATE_HOSTNAME_MISMATCH = env_bool(
     "FIREPLAN_ALLOW_CERTIFICATE_HOSTNAME_MISMATCH"
