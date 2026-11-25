@@ -111,3 +111,5 @@ For pagers, the application records the identifiers and metadata needed to descr
 ## Suivo integration
 
 Suivo REST synchronization uses server-side Client Credentials (`SUIVO_CLIENT_ID`, `SUIVO_CLIENT_SECRET`) and configurable REST/WebSocket origins (`SUIVO_BASE_URL`, `SUIVO_WSS_URL`). It reads units, devices and current unit status into an idempotent local snapshot and uses the existing task, progress, result and SSE stack. Failures preserve the prior successful snapshot; source records omitted by the API are not silently deleted. Integration requests are read-only.
+
+The staff Trackers page has Assets and Trackers tables. Exact unit-to-vehicle matching trims outer whitespace and ignores case, while rejecting partial and ambiguous matches. The UI separates last-seen from position time and battery level from voltage; absent telemetry stays unavailable and does not imply subscription status. No Suivo write actions or local tracker placements are provided.

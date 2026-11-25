@@ -1,10 +1,18 @@
 ---
 phase: 38
 title: Suivo push en dagelijkse reconciliatie
-status: pending
-opened: ~
+status: open
+opened: 2026-11-25
 closed: ~
 ---
+## Carry from phase 37
+1. Trackers page and staff-only snapshot endpoints are in place. Unit matching is exact after trim/case-folding; ambiguity remains unlinked.
+2. The 2026-11-25 live sample had 8 devices without a unit and those device rows contained only identity/type fields. Most unit status rows supplied last-seen and position; no battery-named field appeared. Keep unavailable fields explicit.
+
+## Open follow-ups from phase 37
+- Optional Redis-gated Celery/SSE integration test from phase 35 remains unverified.
+- Repeat visual browser QA when the unavailable CUA/browser host is accessible.
+
 ## Goal
 Verwerk Suivo-unitstatusupdates bijna direct en herstel gemiste updates met een dagelijkse volledige reconciliatie en handmatige refresh.
 
@@ -18,3 +26,6 @@ Verwerk Suivo-unitstatusupdates bijna direct en herstel gemiste updates met een 
 - Tests dekken push-authenticatie, subscription, statusupdates, ping, reconnect, idempotentie, taakvoortgang, schedulerconfiguratie en handmatige refresh.
 
 ## Tasks
+- [ ] task-01-suivo-websocket-consumer-and-idempotent-push.md
+- [ ] task-02-daily-reconciliation-and-manual-refresh-ui.md
+- [ ] task-03-compose-health-and-phase-verification.md

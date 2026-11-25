@@ -19,6 +19,7 @@ const RadioAdminPage = lazy(() => import("@/pages/RadioAdminPage").then((module)
 const FireplanSettingsPage = lazy(() => import("@/pages/FireplanSettingsPage").then((module) => ({ default: module.FireplanSettingsPage })));
 const LabelPrintersPage = lazy(() => import("@/pages/LabelPrintersPage").then((module) => ({ default: module.LabelPrintersPage })));
 const CityGISPage = lazy(() => import("@/pages/CityGISPage").then((module) => ({ default: module.CityGISPage })));
+const SuivoTrackersPage = lazy(() => import("@/pages/SuivoTrackersPage").then((module) => ({ default: module.SuivoTrackersPage })));
 const InventoryPage = lazy(() => import("@/pages/InventoryPage").then((module) => ({ default: module.InventoryPage })));
 const LocationsPage = lazy(() => import("@/pages/LocationsPage").then((module) => ({ default: module.LocationsPage })));
 const FireplanInventoriesPage = lazy(() => import("@/pages/FireplanInventoriesPage").then((module) => ({ default: module.FireplanInventoriesPage })));
@@ -55,6 +56,7 @@ function App() {
         <Route path="labelprinters" element={<LabelPrintersPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="citygis" element={<CityGISPage />} />
+        <Route path="trackers" element={<SuivoTrackersPage />} />
         <Route path="locations" element={<LocationsPage />} />
         <Route path="radiobeheer" element={<RadioAdminPage />} />
         <Route path="fireplan/inventories" element={<FireplanInventoriesPage />} />

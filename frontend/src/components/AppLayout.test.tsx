@@ -33,6 +33,7 @@ describe("AppLayout management navigation", () => {
     expect(screen.getByRole("link", { name: "Background tasks" })).toHaveAttribute("href", "/tasks");
     expect(screen.getByRole("link", { name: "Radio's" })).toHaveAttribute("href", "/radios");
     expect(screen.getByRole("link", { name: "CityGIS" })).toHaveAttribute("href", "/citygis");
+    expect(screen.getByRole("link", { name: "Trackers" })).toHaveAttribute("href", "/trackers");
     expect(screen.queryByRole("link", { name: "Toewijzingen" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Inventarissen" })).not.toBeInTheDocument();
 
@@ -65,6 +66,7 @@ describe("AppLayout management navigation", () => {
     expect(screen.queryByRole("button", { name: "Assetbeheer" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "FirePlan" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "CityGIS" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Trackers" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Locaties" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Inventarissen" })).not.toBeInTheDocument();
   });

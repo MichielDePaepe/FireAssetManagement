@@ -191,3 +191,5 @@ PostgreSQL remains the authoritative store for status, progress, results, and fa
 ## Suivo snapshot
 
 Suivo Client Credentials are read from `SUIVO_CLIENT_ID` and `SUIVO_CLIENT_SECRET`; `SUIVO_BASE_URL` and `SUIVO_WSS_URL` configure REST and WebSocket origins. The `suivo.sync` task fetches all REST resources before atomically upserting units, devices and available unit status. A singleton sync state records attempt/success times and a safe error string. Source IDs are retained and omitted records are not deleted. Request or mapping failures leave the previous snapshot intact. Manual task progress and results use the existing Celery, `celery-progress`, django-celery-results and task SSE path. The task list is single-tenant and PostgreSQL-backed; SSE polls stored task snapshots once per second.
+
+Staff-only `GET /api/suivo/assets/` and `GET /api/suivo/devices/` expose the local snapshot. Vehicle matches compare trimmed, case-folded names and return a relation only for one exact match. Telemetry is returned only when present in the source JSON. The frontend is read-only and does not create local tracker assignments.

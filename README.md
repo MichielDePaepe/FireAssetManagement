@@ -177,3 +177,5 @@ Staff can open **Beheer → Locaties** to create and edit posts, buildings, room
 ## Suivo tracker data
 
 Set `SUIVO_CLIENT_ID` and `SUIVO_CLIENT_SECRET` in `.env` for Suivo OAuth Client Credentials. `SUIVO_BASE_URL` and `SUIVO_WSS_URL` default to `https://integrate.suivo.com` and `wss://integrate.suivo.com/socket`. The backend reads units, devices and latest unit status. Staff can queue a full refresh through the existing Celery task flow. The local snapshot is keyed by Suivo identifiers, does not delete records omitted from a response, and preserves the last successful data after request or processing errors. Credentials and tokens remain server-side.
+
+Staff can browse **Beheer → Trackers** for separate Assets and Trackers tables. Unit-to-vehicle matching requires the complete name after trimming outer spaces and ignoring case; no or multiple exact matches stay unlinked and visible. Missing last-seen, position, or battery data is shown as unavailable, without inferring a subscription state. The page does not edit or move Suivo devices.

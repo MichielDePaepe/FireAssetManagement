@@ -1,4 +1,4 @@
-import { Activity, ArrowLeftRight, Boxes, Building2, ChevronDown, ClipboardList, Gauge, KeyRound, LogOut, Menu, Printer, Radio, X } from "lucide-react";
+import { Activity, ArrowLeftRight, Boxes, Building2, ChevronDown, ClipboardList, Gauge, KeyRound, LogOut, Menu, Printer, Radio, Satellite, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -94,6 +94,9 @@ export function AppLayout() {
                 <KeyRound className="h-4 w-4" />Credentials
               </NavLink>
             </div>}
+            <NavLink to="/trackers" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
+              <Satellite className="h-4 w-4" />Trackers
+            </NavLink>
             <NavLink to="/citygis" onClick={() => setMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 text-sm ${isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
               <CityGISIcon className="h-4 w-4 shrink-0" />CityGIS
             </NavLink>

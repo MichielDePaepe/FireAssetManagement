@@ -141,6 +141,45 @@ export interface FireplanRadioInventoryPage {
   results: FireplanRadioInventory[];
 }
 
+export interface SuivoDeviceSummary {
+  external_id: string;
+  imei: string;
+  type: string;
+}
+
+export interface SuivoAsset {
+  external_id: string;
+  name: string;
+  match_status: "matched" | "none" | "multiple";
+  vehicle: { id: number; name: string } | null;
+  matches: Array<{ id: number; name: string }>;
+  devices: SuivoDeviceSummary[];
+  last_seen_at: string | null;
+  position_at: string | null;
+  position: Record<string, unknown> | null;
+  battery_level: string | number | null;
+  battery_voltage: string | number | null;
+}
+
+export interface SuivoDevice {
+  external_id: string;
+  imei: string;
+  device_type: string;
+  unit: { external_id: string; name: string } | null;
+  last_seen_at: string | null;
+  position_at: string | null;
+  position: Record<string, unknown> | null;
+  battery_level: string | number | null;
+  battery_voltage: string | number | null;
+}
+
+export interface SuivoList<T> {
+  results: T[];
+  last_succeeded_at: string | null;
+  last_error: string;
+  stale: boolean;
+}
+
 export interface StartedTask {
   task_id: string;
   status: "PENDING";
@@ -498,6 +537,8 @@ export const api = {
   logout: () => request<{ ok: boolean }>("/auth/logout/", { method: "POST" }),
   listTasks: () => request<TaskSnapshot[]>("/tasks/"),
   getCityGIS: () => request<CityGISSnapshot>("/citygis/"),
+  getSuivoAssets: () => request<SuivoList<SuivoAsset>>("/suivo/assets/"),
+  getSuivoDevices: () => request<SuivoList<SuivoDevice>>("/suivo/devices/"),
   getCityGISVectorStatusHistory: (vectorId: number) =>
     request<CityGISVectorStatusHistoryItem[]>(`/citygis/vectors/${vectorId}/status-history/`),
   startCityGISRefresh: () => request<StartedTask>("/citygis/refresh/", { method: "POST" }),
