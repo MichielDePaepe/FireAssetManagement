@@ -144,11 +144,20 @@ CELERY_RESULT_EXTENDED = True
 CELERY_RESULT_EXPIRES = int(os.getenv("CELERY_RESULT_EXPIRES", "604800"))
 CELERY_TIMEZONE = "Europe/Brussels"
 CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600}
+_citygis_refresh_interval_raw = os.getenv("CITYGIS_REFRESH_INTERVAL_SECONDS", "60").strip()
+if _citygis_refresh_interval_raw.casefold() == "false":
+    _citygis_refresh_interval = None
+else:
+    try:
+        _citygis_refresh_interval = int(_citygis_refresh_interval_raw)
+    except ValueError as error:
+        raise ValueError(
+            "CITYGIS_REFRESH_INTERVAL_SECONDS must be a positive integer or false."
+        ) from error
+    if _citygis_refresh_interval < 1:
+        raise ValueError("CITYGIS_REFRESH_INTERVAL_SECONDS must be a positive integer or false.")
+
 CELERY_BEAT_SCHEDULE = {
-    "citygis-refresh-every-minute": {
-        "task": "citygis.refresh",
-        "schedule": 60.0,
-    },
     "fireplan-inventory-sync-hourly": {
         "task": "fireplan.sync_inventories",
         "schedule": 3600.0,
@@ -160,6 +169,11 @@ CELERY_BEAT_SCHEDULE = {
         "options": {"ignore_result": True},
     },
 }
+if _citygis_refresh_interval is not None:
+    CELERY_BEAT_SCHEDULE["citygis-refresh"] = {
+        "task": "citygis.refresh",
+        "schedule": float(_citygis_refresh_interval),
+    }
 
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False

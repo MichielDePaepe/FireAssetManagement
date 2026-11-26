@@ -300,8 +300,8 @@ class CityGISTaskTests(TestCase):
             refresh_citygis.run()
         fetch.assert_not_called()
 
-    def test_beat_schedules_refresh_every_minute_and_persists_results(self):
-        schedule = settings.CELERY_BEAT_SCHEDULE["citygis-refresh-every-minute"]
+    def test_beat_schedules_citygis_refresh_and_persists_results(self):
+        schedule = settings.CELERY_BEAT_SCHEDULE["citygis-refresh"]
 
         self.assertEqual(schedule["task"], "citygis.refresh")
         self.assertEqual(schedule["schedule"], 60.0)
